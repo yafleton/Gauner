@@ -80,16 +80,6 @@ const AzureTTS: React.FC = () => {
     }
   }, [ttsService, loadVoices]);
 
-  useEffect(() => {
-    // Filter voices by selected language
-    if (voices.length > 0 && selectedLanguage) {
-      const languageVoices = getLanguageVoices();
-      if (languageVoices.length > 0 && !selectedVoice) {
-        setSelectedVoice(languageVoices[0].ShortName);
-      }
-    }
-  }, [voices, selectedLanguage, selectedVoice, getLanguageVoices]);
-
   const getLanguageVoices = useCallback(() => {
     // Map full language names back to codes for filtering
     const languageCodeMap: { [key: string]: string } = {
@@ -176,6 +166,16 @@ const AzureTTS: React.FC = () => {
       return locale.toLowerCase().startsWith(languageCode.toLowerCase());
     });
   }, [voices, selectedLanguage]);
+
+  useEffect(() => {
+    // Filter voices by selected language
+    if (voices.length > 0 && selectedLanguage) {
+      const languageVoices = getLanguageVoices();
+      if (languageVoices.length > 0 && !selectedVoice) {
+        setSelectedVoice(languageVoices[0].ShortName);
+      }
+    }
+  }, [voices, selectedLanguage, selectedVoice, getLanguageVoices]);
 
   const handleSynthesize = async () => {
     if (!ttsService || !selectedVoice || !text.trim()) {
