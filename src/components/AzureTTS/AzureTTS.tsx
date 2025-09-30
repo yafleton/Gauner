@@ -34,7 +34,7 @@ const AzureTTS: React.FC = () => {
     
     // Always create service, even without API key (for voices)
     return new AzureTTSService(currentApiKey || 'demo-key', currentRegion);
-  }, [user?.azureApiKey, user?.azureRegion]);
+  }, [user?.id, user?.azureApiKey, user?.azureRegion]);
 
   const loadVoices = useCallback(async () => {
     if (!ttsService) return;
@@ -253,6 +253,11 @@ const AzureTTS: React.FC = () => {
 
   // Check if API key is available for synthesis
   const hasApiKey = useMemo(() => {
+    console.log('AzureTTS: hasApiKey check:', {
+      user: user ? 'exists' : 'null',
+      azureApiKey: user?.azureApiKey ? `${user.azureApiKey.substring(0, 8)}...` : 'none',
+      hasApiKey: !!user?.azureApiKey
+    });
     return !!user?.azureApiKey;
   }, [user?.azureApiKey]);
 
