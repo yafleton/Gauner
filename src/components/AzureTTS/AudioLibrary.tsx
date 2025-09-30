@@ -1,35 +1,39 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Play, Pause, Download, Trash2, Clock, FileAudio, Cloud, Smartphone, Monitor, RefreshCw } from 'lucide-react';
+import { Play, Pause, Download, Trash2, Clock, FileAudio, Cloud, Smartphone, Monitor } from 'lucide-react';
 import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
 import { AudioStorageService, AudioFile } from '../../services/audioStorage';
-import CloudStorageService, { CloudAudioFile } from '../../services/cloudStorage';
+import GoogleDriveStorageService, { GoogleDriveAudioFile } from '../../services/googleDriveStorage';
 
 const AudioLibrary: React.FC = () => {
   const { user } = useSimpleAuth();
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
-  const [cloudFiles, setCloudFiles] = useState<CloudAudioFile[]>([]);
+  const [googleDriveFiles, setGoogleDriveFiles] = useState<GoogleDriveAudioFile[]>([]);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showCloudFiles, setShowCloudFiles] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
 
   const audioStorage = useMemo(() => AudioStorageService.getInstance(), []);
-  const cloudStorage = useMemo(() => CloudStorageService.getInstance(), []);
+  const googleDriveStorage = useMemo(() => GoogleDriveStorageService.getInstance(), []);
 
-  const loadAudioFiles = useCallback(() => {
+  const loadAudioFiles = useCallback(async () => {
     if (!user?.id) return;
     
     setIsLoading(true);
     const files = audioStorage.getUserAudioFiles(user.id);
     setAudioFiles(files);
     
-    // Load cloud files
-    const cloudAudioFiles = cloudStorage.getCloudAudioFiles(user.id);
-    setCloudFiles(cloudAudioFiles);
+    // Load Google Drive files
+    try {
+      const googleDriveAudioFiles = await googleDriveStorage.getAudioFiles(user.id);
+      setGoogleDriveFiles(googleDriveAudioFiles);
+    } catch (error) {
+      console.error('Failed to load Google Drive files:', error);
+      setGoogleDriveFiles([]);
+    }
+    
     
     setIsLoading(false);
-  }, [user?.id, audioStorage, cloudStorage]);
+  }, [user?.id, audioStorage, googleDriveStorage]);
 
   useEffect(() => {
     if (user?.id) {
@@ -116,11 +120,12 @@ const AudioLibrary: React.FC = () => {
     }
   };
 
-  const handleCloudDelete = async (fileId: string) => {
+
+  const handleGoogleDriveDelete = async (fileId: string) => {
     if (!user?.id) return;
     
-    if (window.confirm('Are you sure you want to delete this cloud audio file?')) {
-      const result = await cloudStorage.deleteAudioFile(user.id, fileId);
+    if (window.confirm('Are you sure you want to delete this Google Drive audio file?')) {
+      const result = await googleDriveStorage.deleteAudioFile(user.id, fileId);
       if (result.success) {
         loadAudioFiles(); // Reload files after deletion
         if (playingId === fileId && audioElement) {
@@ -129,29 +134,11 @@ const AudioLibrary: React.FC = () => {
           setAudioElement(null);
         }
       } else {
-        alert('Failed to delete cloud file: ' + result.error);
+        alert('Failed to delete Google Drive file: ' + result.error);
       }
     }
   };
 
-  const handleSyncCloud = async () => {
-    if (!user?.id) return;
-    
-    setIsSyncing(true);
-    try {
-      // Force reload cloud files
-      loadAudioFiles();
-      
-      // Simulate sync process
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      console.log('✅ Cloud sync completed');
-    } catch (error) {
-      console.error('❌ Cloud sync error:', error);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   const handleDeleteAll = async () => {
     if (!user?.id) return;
@@ -176,10 +163,6 @@ const AudioLibrary: React.FC = () => {
     return audioStorage.getStorageStats(user.id);
   }, [user?.id, audioStorage]);
 
-  const cloudStats = useMemo(() => {
-    if (!user?.id) return { count: 0, totalSize: 0, devices: [] };
-    return cloudStorage.getCloudStorageStats(user.id);
-  }, [user?.id, cloudStorage]);
 
   if (!user) {
     return (
@@ -201,17 +184,6 @@ const AudioLibrary: React.FC = () => {
             Audio Library
           </h2>
           <div className="flex items-center space-x-2">
-            {cloudFiles.length > 0 && (
-              <button
-                onClick={handleSyncCloud}
-                disabled={isSyncing}
-                className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center space-x-1"
-                title="Sync cloud files"
-              >
-                <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
-                <span>Sync</span>
-              </button>
-            )}
             {audioFiles.length > 0 && (
               <button
                 onClick={handleDeleteAll}
@@ -223,23 +195,19 @@ const AudioLibrary: React.FC = () => {
           </div>
         </div>
         
-        {/* Cloud Storage Toggle */}
+        {/* Google Drive Storage Info */}
         <div className="mt-2">
-          <button
-            onClick={() => setShowCloudFiles(!showCloudFiles)}
-            className="text-sm text-blue-400 hover:text-blue-300 transition-colors flex items-center space-x-1"
-          >
+          <div className="text-sm text-green-400 flex items-center space-x-1">
             <Cloud size={14} />
-            <span>Cloud Storage ({cloudStats.count} files)</span>
-            <span className="text-xs">({cloudStats.devices.length} devices)</span>
-          </button>
+            <span>Google Drive Storage ({googleDriveFiles.length} files)</span>
+          </div>
           <div className="text-xs text-text-secondary mt-1 space-y-1">
-            <p>💡 Tip: Generate audio on your phone, then sync to see it on your PC</p>
-            <div className="bg-yellow-900/20 border border-yellow-500/30 rounded p-2 mt-2">
-              <p className="text-yellow-300 font-medium">⚠️ Cross-Device Limitation</p>
-              <p className="text-yellow-200 text-xs">
-                Current implementation uses localStorage, which is device-specific. 
-                For true cross-device sync, a cloud service (Firebase, AWS, etc.) is required.
+            <p>✅ Cross-Device Sync: Audio files are automatically synced to Google Drive</p>
+            <div className="bg-green-900/20 border border-green-500/30 rounded p-2 mt-2">
+              <p className="text-green-300 font-medium">✅ Google Drive Integration Active</p>
+              <p className="text-green-200 text-xs">
+                Your audio files are automatically saved to Google Drive for cross-device access.
+                Generate audio on any device and it will appear on all your devices.
               </p>
             </div>
           </div>
@@ -262,26 +230,26 @@ const AudioLibrary: React.FC = () => {
         </div>
       )}
 
-      {/* Cloud Files List */}
-      {showCloudFiles && (
+      {/* Google Drive Files List */}
+      {googleDriveFiles.length > 0 && (
         <div className="mb-4">
           <h3 className="text-sm font-medium text-text-primary mb-2 flex items-center space-x-2">
             <Cloud size={16} />
-            <span>Cloud Storage</span>
+            <span>Google Drive Files</span>
           </h3>
           <div className="space-y-2 max-h-40 overflow-y-auto">
-            {cloudFiles.length > 0 ? cloudFiles.map((file) => (
+            {googleDriveFiles.map((file) => (
               <div
                 key={file.id}
-                className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 hover:border-blue-400/50 transition-all duration-200"
+                className="bg-green-900/20 border border-green-500/30 rounded-lg p-3 hover:border-green-400/50 transition-all duration-200"
               >
                 <div className="flex items-start space-x-3">
                   {/* Device Icon */}
-                  <div className="w-8 h-8 bg-blue-600/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 bg-green-600/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                     {file.deviceId.includes('mobile') || file.deviceId.includes('phone') ? (
-                      <Smartphone size={12} className="text-blue-400" />
+                      <Smartphone size={12} className="text-green-400" />
                     ) : (
-                      <Monitor size={12} className="text-blue-400" />
+                      <Monitor size={12} className="text-green-400" />
                     )}
                   </div>
                   
@@ -291,7 +259,7 @@ const AudioLibrary: React.FC = () => {
                       <h3 className="text-sm font-medium text-text-primary truncate">
                         {file.filename}
                       </h3>
-                      <span className="text-xs text-text-secondary bg-blue-900/30 px-2 py-0.5 rounded text-nowrap ml-2">
+                      <span className="text-xs text-text-secondary bg-green-900/30 px-2 py-0.5 rounded text-nowrap ml-2">
                         {audioStorage.formatFileSize(file.size)}
                       </span>
                     </div>
@@ -306,14 +274,14 @@ const AudioLibrary: React.FC = () => {
                   {/* Actions */}
                   <div className="flex items-center space-x-1">
                     <button
-                      onClick={() => handleDownload(file as any)}
-                      className="p-1 text-text-secondary hover:text-accent-purple transition-colors"
-                      title="Download"
+                      onClick={() => window.open(file.driveUrl, '_blank')}
+                      className="p-1 text-text-secondary hover:text-green-400 transition-colors"
+                      title="Open in Google Drive"
                     >
-                      <Download size={14} />
+                      <Cloud size={14} />
                     </button>
                     <button
-                      onClick={() => handleCloudDelete(file.id)}
+                      onClick={() => handleGoogleDriveDelete(file.id)}
                       className="p-1 text-text-secondary hover:text-red-400 transition-colors"
                       title="Delete"
                     >
@@ -322,20 +290,7 @@ const AudioLibrary: React.FC = () => {
                   </div>
                 </div>
               </div>
-            )) : (
-              <div className="text-center py-4 text-text-secondary">
-                <Cloud size={24} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No cloud files yet</p>
-                <p className="text-xs">Generate audio on another device to see it here</p>
-                <div className="bg-blue-900/20 border border-blue-500/30 rounded p-2 mt-3">
-                  <p className="text-blue-300 font-medium text-xs">📱 Cross-Device Note</p>
-                  <p className="text-blue-200 text-xs">
-                    Files are stored locally per device. For cross-device access, 
-                    a cloud service integration is needed.
-                  </p>
-                </div>
-              </div>
-            )}
+            ))}
           </div>
         </div>
       )}
@@ -346,7 +301,7 @@ const AudioLibrary: React.FC = () => {
           <div className="loading mx-auto mb-4"></div>
           <p className="text-text-secondary">Loading audio files...</p>
         </div>
-      ) : audioFiles.length === 0 && cloudFiles.length === 0 ? (
+      ) : audioFiles.length === 0 && googleDriveFiles.length === 0 ? (
         <div className="text-center py-8">
           <FileAudio size={48} className="text-text-secondary mx-auto mb-4" />
           <p className="text-text-secondary mb-2">No audio files yet</p>
