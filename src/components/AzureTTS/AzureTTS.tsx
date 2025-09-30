@@ -259,7 +259,7 @@ const AzureTTS: React.FC = () => {
       hasApiKey: !!user?.azureApiKey
     });
     return !!user?.azureApiKey;
-  }, [user?.azureApiKey]);
+  }, [user]);
 
   return (
     <div className="p-8">
