@@ -20,6 +20,7 @@
 - **Build command**: `npm run build`
 - **Build output directory**: `build`
 - **Root directory**: `/` (leave empty)
+- **Node.js version**: `18` (recommended)
 
 ### Step 3: Environment Variables (Optional)
 Add any environment variables if needed:
