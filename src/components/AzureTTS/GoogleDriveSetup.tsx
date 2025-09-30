@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Cloud, CheckCircle, AlertCircle, Copy, ExternalLink, Shield } from 'lucide-react';
+import { Cloud, CheckCircle, AlertCircle, Copy, ExternalLink } from 'lucide-react';
 
 const GoogleDriveSetup: React.FC = () => {
   const [copied, setCopied] = useState<string | null>(null);
@@ -37,16 +37,16 @@ const GoogleDriveSetup: React.FC = () => {
     },
     {
       title: "5. Konfiguration aktualisieren",
-      description: "Ersetzen Sie die Platzhalter in googleDriveStorage.ts mit Ihren Werten",
+      description: "Die Konfiguration wurde bereits mit Ihren Werten aktualisiert",
       link: null,
-      code: `const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';
-const API_KEY = 'YOUR_GOOGLE_API_KEY';`
+      code: `const CLIENT_ID = '679494238214-lnnselboo16bsogbtmrp3bl52r6gikeu.apps.googleusercontent.com';
+const API_KEY = 'AIzaSyBVeNrc3QeryTV8npFerdD0P9tRbxpCNpc';`
     }
   ];
 
   const oauthConfig = `{
   "web": {
-    "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+    "client_id": "679494238214-lnnselboo16bsogbtmrp3bl52r6gikeu.apps.googleusercontent.com",
     "project_id": "your-project-id",
     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
     "token_uri": "https://oauth2.googleapis.com/token",
@@ -66,8 +66,8 @@ const API_KEY = 'YOUR_GOOGLE_API_KEY';`
     // Initialize Google API
     gapi.load('client', () => {
       gapi.client.init({
-        apiKey: 'YOUR_API_KEY',
-        clientId: 'YOUR_CLIENT_ID',
+        apiKey: 'AIzaSyBVeNrc3QeryTV8npFerdD0P9tRbxpCNpc',
+        clientId: '679494238214-lnnselboo16bsogbtmrp3bl52r6gikeu.apps.googleusercontent.com',
         discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
         scope: 'https://www.googleapis.com/auth/drive.file'
       });
@@ -101,19 +101,19 @@ const API_KEY = 'YOUR_GOOGLE_API_KEY';`
           </div>
         </div>
 
-        {/* No Credit Card Required */}
-        <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+        {/* Configuration Complete */}
+        <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
           <div className="flex items-start space-x-3">
-            <Shield size={20} className="text-blue-400 mt-0.5" />
+            <CheckCircle size={20} className="text-green-400 mt-0.5" />
             <div>
-              <h3 className="text-blue-300 font-medium mb-2">Keine Kreditkarte erforderlich</h3>
-              <p className="text-blue-200 text-sm mb-2">
-                Google Drive API ist kostenlos für persönliche Nutzung. Sie benötigen nur:
+              <h3 className="text-green-300 font-medium mb-2">✅ Konfiguration abgeschlossen</h3>
+              <p className="text-green-200 text-sm mb-2">
+                Ihre Google Drive API Credentials wurden erfolgreich konfiguriert:
               </p>
-              <ul className="text-blue-200 text-sm space-y-1 ml-4">
-                <li>• Ein Google-Konto (kostenlos)</li>
-                <li>• Google Cloud Console Zugang (kostenlos)</li>
-                <li>• Keine Kreditkarte oder Zahlungsinformationen</li>
+              <ul className="text-green-200 text-sm space-y-1 ml-4">
+                <li>• Client ID: 679494238214-lnnselboo16bsogbtmrp3bl52r6gikeu.apps.googleusercontent.com</li>
+                <li>• API Key: AIzaSyBVeNrc3QeryTV8npFerdD0P9tRbxpCNpc</li>
+                <li>• Bereit für Cross-Device Audio-Synchronisation</li>
               </ul>
             </div>
           </div>
@@ -222,12 +222,12 @@ const API_KEY = 'YOUR_GOOGLE_API_KEY';`
           <div className="flex items-start space-x-3">
             <Cloud size={20} className="text-blue-400 mt-0.5" />
             <div>
-              <h4 className="text-blue-300 font-medium mb-2">Nach der Einrichtung</h4>
+              <h4 className="text-blue-300 font-medium mb-2">Bereit für die Nutzung</h4>
               <ul className="text-blue-200 text-sm space-y-1">
-                <li>• Ersetzen Sie die Konfiguration in <code>src/services/googleDriveStorage.ts</code></li>
-                <li>• Aktualisieren Sie <code>CloudStorageService</code> um <code>GoogleDriveStorageService</code> zu verwenden</li>
-                <li>• Testen Sie, indem Sie Audio auf einem Gerät generieren und auf einem anderen überprüfen</li>
-                <li>• Dateien werden in Ihrem Google Drive gespeichert und synchronisiert</li>
+                <li>• ✅ Konfiguration in <code>src/services/googleDriveStorage.ts</code> aktualisiert</li>
+                <li>• 🔄 Aktualisieren Sie <code>CloudStorageService</code> um <code>GoogleDriveStorageService</code> zu verwenden</li>
+                <li>• 🧪 Testen Sie, indem Sie Audio auf einem Gerät generieren und auf einem anderen überprüfen</li>
+                <li>• ☁️ Dateien werden in Ihrem Google Drive gespeichert und synchronisiert</li>
               </ul>
             </div>
           </div>

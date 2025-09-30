@@ -28,8 +28,8 @@ class GoogleDriveStorageService {
   private static instance: GoogleDriveStorageService;
   private gapi: any = null;
   private initialized = false;
-  private readonly CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';
-  private readonly API_KEY = 'YOUR_GOOGLE_API_KEY';
+  private readonly CLIENT_ID = '679494238214-lnnselboo16bsogbtmrp3bl52r6gikeu.apps.googleusercontent.com';
+  private readonly API_KEY = 'AIzaSyBVeNrc3QeryTV8npFerdD0P9tRbxpCNpc';
   private readonly DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
   private readonly SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
