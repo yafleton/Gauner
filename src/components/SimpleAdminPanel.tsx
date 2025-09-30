@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSimpleAuth } from '../contexts/SimpleAuthContext';
-import { Eye, EyeOff, Shield, Users, Settings, Key, Trash2 } from 'lucide-react';
+import { Shield, Users, Trash2 } from 'lucide-react';
 
 const SimpleAdminPanel: React.FC = () => {
   const { 
@@ -26,7 +26,7 @@ const SimpleAdminPanel: React.FC = () => {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [loadUsers]);
 
   const loadUsers = async () => {
     setLoadingUsers(true);

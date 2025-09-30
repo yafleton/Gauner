@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Mic, Download, Loader, Save } from 'lucide-react';
+import { Mic, Loader, Save } from 'lucide-react';
 import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
 import { AzureTTSService } from '../../services/azureTTS';
 import { AudioStorageService } from '../../services/audioStorage';
@@ -88,7 +88,7 @@ const AzureTTS: React.FC = () => {
         setSelectedVoice(languageVoices[0].ShortName);
       }
     }
-  }, [voices, selectedLanguage, selectedVoice]);
+  }, [voices, selectedLanguage, selectedVoice, getLanguageVoices]);
 
   const handleSynthesize = async () => {
     if (!ttsService || !selectedVoice || !text.trim()) {

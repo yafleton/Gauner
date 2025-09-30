@@ -23,8 +23,6 @@ const NicheFinder: React.FC = () => {
   });
 
   const cache = CacheService.getInstance();
-  const youtubeApi = useMemo(() => YouTubeApiService.getInstance(), []);
-  const cloudConfig = useMemo(() => CloudConfigService.getInstance(), []);
   const tubechefApi = useMemo(() => TubeChefApiService.getInstance(), []);
 
   // Mock data - replace with actual API call

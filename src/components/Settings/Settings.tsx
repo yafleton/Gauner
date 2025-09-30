@@ -44,7 +44,7 @@ const Settings: React.FC = () => {
         setYoutubeKey(savedYoutubeKey);
       }
     }
-  }, [user]);
+  }, [user, cloudConfig]);
 
   const handleSave = async () => {
     if (!azureKey.trim()) {
