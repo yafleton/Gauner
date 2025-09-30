@@ -70,6 +70,24 @@ class AuthService {
       this.saveUsers(users);
       console.log('✅ Default test user created: testuser');
     }
+
+    // Check if Abdalla user exists
+    if (!users.find(u => u.username === 'Abdalla')) {
+      const abdallaUser: User = {
+        id: 'user-002',
+        username: 'Abdalla',
+        email: 'abdalla@gauner.com',
+        password: 'Abdul123',
+        role: 'user',
+        createdAt: new Date(),
+        hasPermission: true,
+        azureRegion: 'eastus'
+        // Azure API key will be set by user in settings
+      };
+      users.push(abdallaUser);
+      this.saveUsers(users);
+      console.log('✅ User Abdalla created - Azure API key to be configured in settings');
+    }
   }
 
   // Get all users
