@@ -3,7 +3,6 @@ import { Mic, Loader, Save, Cloud } from 'lucide-react';
 import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
 import { AzureTTSService } from '../../services/azureTTS';
 import { AudioStorageService } from '../../services/audioStorage';
-import CloudStorageService from '../../services/cloudStorage';
 import GoogleDriveStorageService from '../../services/googleDriveStorage';
 import { AzureVoice } from '../../types';
 import AudioLibrary from './AudioLibrary';
@@ -21,9 +20,10 @@ const AzureTTS: React.FC = () => {
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [customFilename, setCustomFilename] = useState('');
   const [activeTab, setActiveTab] = useState<'generate' | 'library'>('generate');
+  const [isGoogleDriveReady, setIsGoogleDriveReady] = useState(false);
+  const [googleDriveAuthStatus, setGoogleDriveAuthStatus] = useState<'checking' | 'authenticated' | 'not-authenticated' | 'error'>('checking');
 
   const audioStorage = useMemo(() => AudioStorageService.getInstance(), []);
-  const cloudStorage = useMemo(() => CloudStorageService.getInstance(), []);
   const googleDriveStorage = useMemo(() => GoogleDriveStorageService.getInstance(), []);
 
   const ttsService = useMemo(() => {
@@ -71,6 +71,28 @@ const AzureTTS: React.FC = () => {
       loadVoices();
     }
   }, [ttsService, loadVoices]);
+
+  // Check Google Drive status
+  useEffect(() => {
+    const checkGoogleDriveStatus = async () => {
+      try {
+        const isReady = await googleDriveStorage.isReady();
+        setIsGoogleDriveReady(isReady);
+        
+        if (isReady) {
+          const isAuth = await googleDriveStorage.isAuthenticated();
+          setGoogleDriveAuthStatus(isAuth ? 'authenticated' : 'not-authenticated');
+        } else {
+          setGoogleDriveAuthStatus('error');
+        }
+      } catch (error) {
+        console.error('Google Drive status check failed:', error);
+        setGoogleDriveAuthStatus('error');
+      }
+    };
+
+    checkGoogleDriveStatus();
+  }, [googleDriveStorage]);
 
   const getLanguageVoices = useCallback(() => {
     // Map full language names back to codes for filtering
@@ -195,18 +217,10 @@ const AzureTTS: React.FC = () => {
 
           // Save to user's audio storage
           if (user?.id) {
-            await audioStorage.saveAudio(
-              user.id,
-              audioBuffer,
-              selectedVoice,
-              text,
-              filename
-            );
-
-            // Also save to cloud storage for cross-device access
             const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
             
-            const cloudAudioFile = {
+            // Create audio file object
+            const audioFile = {
               id: uuidv4(),
               userId: user.id,
               filename: customFilename.trim() || `audio-${timestamp}.wav`,
@@ -216,39 +230,46 @@ const AzureTTS: React.FC = () => {
               voice: selectedVoice,
               text: text.substring(0, 100), // First 100 chars
               size: audioBlob.size,
-              uploadedAt: new Date().toISOString(),
-              deviceId: cloudStorage.getDeviceId(),
             };
 
-                // Save to Google Drive for cross-device access
-                const googleDriveResult = await googleDriveStorage.saveAudioFile(user.id, {
-                  id: uuidv4(),
-                  userId: user.id,
-                  filename: customFilename.trim() || `audio-${timestamp}.wav`,
-                  blob: audioBlob,
-                  createdAt: new Date(),
-                  expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-                  voice: selectedVoice,
-                  text: text.substring(0, 100), // First 100 chars
-                  size: audioBlob.size,
-                });
-                if (googleDriveResult.success) {
-                  console.log('✅ Audio file saved to Google Drive for cross-device access');
-                } else {
-                  console.warn('⚠️ Failed to save to Google Drive:', googleDriveResult.error);
-                  
-                  // Fallback to localStorage-based cloud storage
-                  const cloudResult = await cloudStorage.saveAudioFile(user.id, cloudAudioFile);
-                  if (cloudResult.success) {
-                    console.log('✅ Audio file saved to localStorage cloud storage as fallback');
-                  } else {
-                    console.warn('⚠️ Failed to save to cloud storage:', cloudResult.error);
-                  }
-                }
+            // Try to save to Google Drive first (for cross-device sync)
+            if (isGoogleDriveReady && googleDriveAuthStatus === 'authenticated') {
+              console.log('🔄 Uploading to Google Drive...');
+              const googleDriveResult = await googleDriveStorage.saveAudioFile(user.id, audioFile);
+              
+              if (googleDriveResult.success) {
+                console.log('✅ Audio file saved to Google Drive for cross-device access');
+                setShowSaveSuccess(true);
+                setTimeout(() => setShowSaveSuccess(false), 3000);
+              } else {
+                console.warn('⚠️ Failed to save to Google Drive:', googleDriveResult.error);
+                // Fallback to local storage
+                await audioStorage.saveAudio(
+                  user.id,
+                  audioBuffer,
+                  selectedVoice,
+                  text,
+                  filename
+                );
+                console.log('✅ Audio file saved to local storage as fallback');
+                setShowSaveSuccess(true);
+                setTimeout(() => setShowSaveSuccess(false), 3000);
+              }
+            } else {
+              // Save to local storage only
+              await audioStorage.saveAudio(
+                user.id,
+                audioBuffer,
+                selectedVoice,
+                text,
+                filename
+              );
+              console.log('✅ Audio file saved to local storage');
+              setShowSaveSuccess(true);
+              setTimeout(() => setShowSaveSuccess(false), 3000);
+            }
 
             setCustomFilename('');
-            setShowSaveSuccess(true);
-            setTimeout(() => setShowSaveSuccess(false), 3000);
           }
 
     } catch (error) {
@@ -485,10 +506,53 @@ const AzureTTS: React.FC = () => {
                 <div className="mt-4 bg-green-900/20 border border-green-500/50 text-green-400 px-4 py-3 rounded-lg">
                   <div className="flex items-center">
                     <Save size={16} className="mr-2" />
-                    Audio generated and saved to your library (24h)
+                    {isGoogleDriveReady && googleDriveAuthStatus === 'authenticated' 
+                      ? 'Audio saved to Google Drive!' 
+                      : 'Audio saved to local library!'
+                    }
                   </div>
                 </div>
               )}
+
+              {/* Google Drive Status */}
+              <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Cloud size={16} className="text-blue-400" />
+                  <span className="text-blue-300 font-medium text-sm">Google Drive Status</span>
+                </div>
+                {googleDriveAuthStatus === 'checking' && (
+                  <p className="text-blue-200 text-xs">Checking Google Drive connection...</p>
+                )}
+                {googleDriveAuthStatus === 'authenticated' && (
+                  <div>
+                    <p className="text-green-300 text-xs">✅ Connected to Google Drive</p>
+                    <p className="text-green-200 text-xs">Audio files will sync across all your devices</p>
+                  </div>
+                )}
+                {googleDriveAuthStatus === 'not-authenticated' && (
+                  <div>
+                    <p className="text-yellow-300 text-xs">⚠️ Google Drive not connected</p>
+                    <p className="text-yellow-200 text-xs">Audio files will be saved locally only</p>
+                    <button
+                      onClick={async () => {
+                        const success = await googleDriveStorage.authenticate();
+                        if (success) {
+                          setGoogleDriveAuthStatus('authenticated');
+                        }
+                      }}
+                      className="mt-2 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition-colors"
+                    >
+                      Connect Google Drive
+                    </button>
+                  </div>
+                )}
+                {googleDriveAuthStatus === 'error' && (
+                  <div>
+                    <p className="text-red-300 text-xs">❌ Google Drive connection failed</p>
+                    <p className="text-red-200 text-xs">Audio files will be saved locally only</p>
+                  </div>
+                )}
+              </div>
 
               {/* Error Message */}
               {error && (

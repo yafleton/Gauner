@@ -90,7 +90,7 @@ class GoogleDriveStorageService {
   }
 
   // Check if Google Drive is ready
-  private isReady(): boolean {
+  isReady(): boolean {
     return this.initialized && this.gapi;
   }
 
