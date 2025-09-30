@@ -56,14 +56,16 @@ class GoogleDriveStorageService {
 
       // Wait for google to be available
       let attempts = 0;
-      while (!window.google && attempts < 20) {
-        console.log(`⏳ Waiting for Google Identity Services... attempt ${attempts + 1}/20`);
-        await new Promise(resolve => setTimeout(resolve, 500));
+      while (!window.google && attempts < 30) {
+        console.log(`⏳ Waiting for Google Identity Services... attempt ${attempts + 1}/30`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
         attempts++;
       }
 
       if (!window.google) {
-        throw new Error('Google Identity Services failed to load after 20 attempts');
+        console.error('❌ Google Identity Services failed to load after 30 attempts');
+        console.log('🔍 Available window properties:', Object.keys(window).filter(key => key.includes('google')));
+        throw new Error('Google Identity Services failed to load after 30 attempts');
       }
 
       console.log('✅ Google Identity Services loaded:', !!window.google);
@@ -91,11 +93,15 @@ class GoogleDriveStorageService {
       // Load Google Identity Services
       const gisScript = document.createElement('script');
       gisScript.src = 'https://accounts.google.com/gsi/client';
-      gisScript.async = true;
-      gisScript.defer = true;
+      gisScript.async = false; // Load synchronously to ensure proper initialization
+      gisScript.defer = false;
       gisScript.onload = () => {
         console.log('✅ Google Identity Services script loaded successfully');
-        resolve();
+        // Wait a bit more for the google object to be available
+        setTimeout(() => {
+          console.log('🔍 Checking for window.google after script load:', !!window.google);
+          resolve();
+        }, 1000);
       };
       gisScript.onerror = (error) => {
         console.error('❌ Failed to load Google Identity Services script:', error);
