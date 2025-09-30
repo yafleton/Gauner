@@ -16,8 +16,11 @@ class CloudStorageService {
   private static instance: CloudStorageService;
   private readonly CLOUD_STORAGE_KEY = 'gauner_cloud_audio';
   private readonly USER_DEVICE_ID = 'gauner_device_id';
-  private readonly SYNC_INTERVAL = 30000; // 30 seconds
+  private readonly SYNC_INTERVAL = 10000; // 10 seconds
   private syncTimer: NodeJS.Timeout | null = null;
+  private readonly CLOUD_API_URL = 'https://api.jsonbin.io/v3/b';
+  private readonly CLOUD_API_KEY = '$2a$10$YOUR_API_KEY_HERE'; // Replace with actual API key
+  private readonly BIN_ID = 'YOUR_BIN_ID_HERE'; // Replace with actual bin ID
 
   private constructor() {
     this.initializeDeviceId();
@@ -57,18 +60,23 @@ class CloudStorageService {
   // Background sync to check for updates
   private async performBackgroundSync(): Promise<void> {
     try {
-      // Check for cross-device updates using localStorage events
-      // This is a simple approach - in production you'd use a real cloud service
       console.log('🔄 Background sync check...');
       
-      // Listen for storage events (when localStorage changes in other tabs/devices)
+      // For now, we'll use a simple approach with localStorage
+      // In production, this would sync with a real cloud service
+      // The limitation is that localStorage is device-specific
+      
+      // Listen for storage events (when localStorage changes in other tabs)
       window.addEventListener('storage', (e) => {
         if (e.key && e.key.startsWith('gauner_cloud_audio_')) {
-          console.log('📱 Cross-device update detected:', e.key);
-          // Trigger a refresh of cloud files
+          console.log('📱 Cross-tab update detected:', e.key);
           this.triggerCloudUpdate();
         }
       });
+      
+      // For cross-device sync, we need a real cloud service
+      // This is a placeholder for future implementation
+      console.log('💡 Note: Cross-device sync requires a cloud service (Firebase, AWS, etc.)');
     } catch (error) {
       console.error('❌ Background sync error:', error);
     }
@@ -115,6 +123,9 @@ class CloudStorageService {
       // Also save to a global sync key for cross-device access
       this.updateGlobalSync(userId, syncData);
       
+      // Try to sync with cloud service (if available)
+      await this.syncToCloud(userId, syncData);
+      
       console.log('✅ Audio file saved to cloud storage:', {
         userId,
         fileName: audioFile.filename,
@@ -126,6 +137,32 @@ class CloudStorageService {
     } catch (error) {
       console.error('❌ Error saving audio file to cloud:', error);
       return { success: false, error: 'Failed to save audio file to cloud storage' };
+    }
+  }
+
+  // Sync data to cloud service (placeholder for real implementation)
+  private async syncToCloud(userId: string, syncData: any): Promise<void> {
+    try {
+      // This is a placeholder for real cloud sync
+      // In production, you would:
+      // 1. Upload to Firebase Storage, AWS S3, or similar
+      // 2. Store metadata in a database
+      // 3. Use real-time sync with WebSockets or Server-Sent Events
+      
+      console.log('☁️ Cloud sync placeholder - would upload to cloud service');
+      console.log('📊 Data to sync:', {
+        userId,
+        fileCount: syncData.files.length,
+        deviceId: syncData.deviceId,
+        lastUpdated: new Date(syncData.lastUpdated).toISOString()
+      });
+      
+      // For now, we'll use a simple approach with localStorage
+      // The limitation is that localStorage is device-specific
+      // To make this work across devices, you need a real cloud service
+      
+    } catch (error) {
+      console.error('❌ Cloud sync error:', error);
     }
   }
 

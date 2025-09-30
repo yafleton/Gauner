@@ -233,9 +233,16 @@ const AudioLibrary: React.FC = () => {
             <span>Cloud Storage ({cloudStats.count} files)</span>
             <span className="text-xs">({cloudStats.devices.length} devices)</span>
           </button>
-          <p className="text-xs text-text-secondary mt-1">
-            💡 Tip: Generate audio on your phone, then sync to see it on your PC
-          </p>
+          <div className="text-xs text-text-secondary mt-1 space-y-1">
+            <p>💡 Tip: Generate audio on your phone, then sync to see it on your PC</p>
+            <div className="bg-yellow-900/20 border border-yellow-500/30 rounded p-2 mt-2">
+              <p className="text-yellow-300 font-medium">⚠️ Cross-Device Limitation</p>
+              <p className="text-yellow-200 text-xs">
+                Current implementation uses localStorage, which is device-specific. 
+                For true cross-device sync, a cloud service (Firebase, AWS, etc.) is required.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -320,6 +327,13 @@ const AudioLibrary: React.FC = () => {
                 <Cloud size={24} className="mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No cloud files yet</p>
                 <p className="text-xs">Generate audio on another device to see it here</p>
+                <div className="bg-blue-900/20 border border-blue-500/30 rounded p-2 mt-3">
+                  <p className="text-blue-300 font-medium text-xs">📱 Cross-Device Note</p>
+                  <p className="text-blue-200 text-xs">
+                    Files are stored locally per device. For cross-device access, 
+                    a cloud service integration is needed.
+                  </p>
+                </div>
               </div>
             )}
           </div>
