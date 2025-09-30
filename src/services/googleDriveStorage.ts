@@ -285,28 +285,44 @@ class GoogleDriveStorageService {
         };
       }
 
-      // Upload file to Google Drive using fetch API
-      const formData = new FormData();
-      formData.append('metadata', JSON.stringify({
+      // Use resumable upload to avoid CORS issues
+      const metadata = {
         name: audioFile.filename,
         parents: [folderId]
-      }));
-      formData.append('file', audioFile.blob, audioFile.filename);
+      };
 
-      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      // Step 1: Create the file metadata
+      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
         },
-        body: formData
+        body: JSON.stringify(metadata)
       });
 
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
+      if (!createResponse.ok) {
+        throw new Error(`Failed to create file metadata: ${createResponse.statusText}`);
       }
 
-      const result = await response.json();
-      const driveFileId = result.id;
+      const createResult = await createResponse.json();
+      const fileId = createResult.id;
+
+      // Step 2: Upload the file content using resumable upload
+      const uploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'audio/wav'
+        },
+        body: audioFile.blob
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Failed to upload file content: ${uploadResponse.statusText}`);
+      }
+
+      const driveFileId = fileId;
       const driveUrl = `https://drive.google.com/file/d/${driveFileId}/view`;
 
       const googleDriveAudioFile: GoogleDriveAudioFile = {
