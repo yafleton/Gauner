@@ -113,7 +113,7 @@ const AudioLibrary: React.FC = () => {
   const stats = useMemo(() => {
     if (!user?.id) return { count: 0, totalSize: 0 };
     return audioStorage.getStorageStats(user.id);
-  }, [user?.id, audioFiles]);
+  }, [user?.id, audioFiles, audioStorage]);
 
   if (!user) {
     return (

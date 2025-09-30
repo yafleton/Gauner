@@ -88,7 +88,7 @@ const AzureTTS: React.FC = () => {
         setSelectedVoice(languageVoices[0].ShortName);
       }
     }
-  }, [voices, selectedLanguage, selectedVoice]);
+  }, [voices, selectedLanguage, selectedVoice, getLanguageVoices]);
 
   const getLanguageVoices = useCallback(() => {
     // Map full language names back to codes for filtering
