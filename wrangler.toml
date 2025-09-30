@@ -3,3 +3,8 @@ compatibility_date = "2024-01-01"
 
 # Pages configuration for static hosting
 pages_build_output_dir = "build"
+
+# Build configuration
+[build]
+command = "npm run build"
+cwd = "."
