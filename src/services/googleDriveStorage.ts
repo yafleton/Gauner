@@ -47,20 +47,25 @@ class GoogleDriveStorageService {
   // Initialize Google Drive API
   private async initializeGoogleDrive(): Promise<void> {
     try {
+      console.log('🔄 Initializing Google Drive API...');
+      
       // Load Google API script
       if (!window.gapi) {
+        console.log('📥 Loading Google API script...');
         await this.loadGoogleAPI();
       }
 
       // Initialize gapi
+      console.log('🔧 Loading gapi client...');
       await new Promise((resolve, reject) => {
-        window.gapi.load('client', {
+        window.gapi.load('client:auth2', {
           callback: resolve,
           onerror: reject
         });
       });
 
       // Initialize client
+      console.log('⚙️ Initializing gapi client...');
       await window.gapi.client.init({
         apiKey: this.API_KEY,
         clientId: this.CLIENT_ID,
@@ -81,10 +86,24 @@ class GoogleDriveStorageService {
   // Load Google API script
   private loadGoogleAPI(): Promise<void> {
     return new Promise((resolve, reject) => {
+      // Check if script already exists
+      if (document.querySelector('script[src*="apis.google.com"]')) {
+        resolve();
+        return;
+      }
+
       const script = document.createElement('script');
       script.src = 'https://apis.google.com/js/api.js';
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Google API'));
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        console.log('✅ Google API script loaded');
+        resolve();
+      };
+      script.onerror = () => {
+        console.error('❌ Failed to load Google API script');
+        reject(new Error('Failed to load Google API'));
+      };
       document.head.appendChild(script);
     });
   }
@@ -102,7 +121,8 @@ class GoogleDriveStorageService {
     }
 
     try {
-      const authInstance = await this.gapi.auth2.getAuthInstance();
+      console.log('🔐 Starting Google Drive authentication...');
+      const authInstance = this.gapi.auth2.getAuthInstance();
       const user = await authInstance.signIn();
       
       console.log('✅ Google Drive authentication successful:', user.getBasicProfile().getName());
@@ -118,7 +138,7 @@ class GoogleDriveStorageService {
     if (!this.isReady()) return false;
 
     try {
-      const authInstance = await this.gapi.auth2.getAuthInstance();
+      const authInstance = this.gapi.auth2.getAuthInstance();
       return authInstance.isSignedIn.get();
     } catch (error) {
       console.error('❌ Authentication check error:', error);
@@ -204,19 +224,36 @@ class GoogleDriveStorageService {
       // Convert blob to base64
       const base64Data = await this.blobToBase64(audioFile.blob);
 
-      // Upload file to Google Drive
-      const response = await this.gapi.client.drive.files.create({
-        resource: {
-          name: audioFile.filename,
-          parents: [folderId]
+      // Upload file to Google Drive using multipart upload
+      const boundary = '-------314159265358979323846';
+      const delimiter = "\r\n--" + boundary + "\r\n";
+      const close_delim = "\r\n--" + boundary + "--";
+
+      const metadata = {
+        'name': audioFile.filename,
+        'parents': [folderId]
+      };
+
+      const multipartRequestBody =
+        delimiter +
+        'Content-Type: application/json\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        'Content-Type: audio/wav\r\n\r\n' +
+        base64Data +
+        close_delim;
+
+      const response = await this.gapi.client.request({
+        'path': 'https://www.googleapis.com/upload/drive/v3/files',
+        'method': 'POST',
+        'params': {'uploadType': 'multipart'},
+        'headers': {
+          'Content-Type': 'multipart/related; boundary="' + boundary + '"'
         },
-        media: {
-          mimeType: 'audio/wav',
-          body: base64Data
-        }
+        'body': multipartRequestBody
       });
 
-      const driveFileId = response.result.id;
+      const driveFileId = response.id;
       const driveUrl = `https://drive.google.com/file/d/${driveFileId}/view`;
 
       const googleDriveAudioFile: GoogleDriveAudioFile = {
