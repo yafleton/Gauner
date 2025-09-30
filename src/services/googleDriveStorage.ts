@@ -50,82 +50,48 @@ class GoogleDriveStorageService {
     try {
       console.log('🔄 Initializing Google Drive API...');
       
-      // Load Google API script
-      if (!window.gapi) {
-        console.log('📥 Loading Google API script...');
-        await this.loadGoogleAPI();
+      // Load Google Identity Services
+      if (!window.google) {
+        console.log('📥 Loading Google Identity Services...');
+        await this.loadGoogleIdentityServices();
       }
 
-      // Wait for gapi to be available
+      // Wait for google to be available
       let attempts = 0;
-      while (!window.gapi && attempts < 10) {
+      while (!window.google && attempts < 10) {
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
       }
 
-      if (!window.gapi) {
-        throw new Error('Google API failed to load');
+      if (!window.google) {
+        throw new Error('Google Identity Services failed to load');
       }
 
-      // Initialize gapi with new approach
-      console.log('🔧 Loading gapi client...');
-      await new Promise((resolve, reject) => {
-        window.gapi.load('client', {
-          callback: resolve,
-          onerror: reject
-        });
-      });
-
-      // Initialize client
-      console.log('⚙️ Initializing gapi client...');
-      await window.gapi.client.init({
-        apiKey: this.API_KEY,
-        clientId: this.CLIENT_ID,
-        discoveryDocs: [this.DISCOVERY_DOC],
-        scope: this.SCOPES
-      });
-
-      this.gapi = window.gapi;
       this.initialized = true;
-
-      console.log('✅ Google Drive API initialized successfully');
+      console.log('✅ Google Identity Services initialized successfully');
     } catch (error) {
       console.error('❌ Google Drive initialization error:', error);
       this.initialized = false;
     }
   }
 
-  // Load Google API script
-  private loadGoogleAPI(): Promise<void> {
+  // Load Google Identity Services
+  private loadGoogleIdentityServices(): Promise<void> {
     return new Promise((resolve, reject) => {
       // Check if script already exists
-      if (document.querySelector('script[src*="apis.google.com"]')) {
+      if (document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
         resolve();
         return;
       }
 
-      // Load Google Identity Services first
+      // Load Google Identity Services
       const gisScript = document.createElement('script');
       gisScript.src = 'https://accounts.google.com/gsi/client';
       gisScript.async = true;
       gisScript.defer = true;
       gisScript.onload = () => {
         console.log('✅ Google Identity Services loaded');
-        
-        // Then load the API script
-        const apiScript = document.createElement('script');
-        apiScript.src = 'https://apis.google.com/js/api.js';
-        apiScript.async = true;
-        apiScript.defer = true;
-        apiScript.onload = () => {
-          console.log('✅ Google API script loaded');
-          resolve();
-        };
-        apiScript.onerror = () => {
-          console.error('❌ Failed to load Google API script');
-          reject(new Error('Failed to load Google API'));
-        };
-        document.head.appendChild(apiScript);
+        resolve();
       };
       gisScript.onerror = () => {
         console.error('❌ Failed to load Google Identity Services');
@@ -137,11 +103,10 @@ class GoogleDriveStorageService {
 
   // Check if Google Drive is ready
   isReady(): boolean {
-    const ready = this.initialized && this.gapi && window.gapi;
+    const ready = this.initialized && window.google;
     console.log('🔍 Google Drive ready check:', {
       initialized: this.initialized,
-      hasGapi: !!this.gapi,
-      hasWindowGapi: !!window.gapi,
+      hasGoogle: !!window.google,
       ready
     });
     return ready;
@@ -163,7 +128,8 @@ class GoogleDriveStorageService {
         scope: this.SCOPES,
         callback: (response: any) => {
           console.log('✅ Google Drive authentication successful');
-          this.initialized = true;
+          // Store the access token for later use
+          localStorage.setItem('google_drive_access_token', response.access_token);
         },
         error_callback: (error: any) => {
           console.error('❌ Google Drive authentication error:', error);
@@ -187,7 +153,7 @@ class GoogleDriveStorageService {
 
     try {
       // Check if we have a valid access token
-      const token = window.google?.accounts?.oauth2?.getToken();
+      const token = localStorage.getItem('google_drive_access_token');
       const isSignedIn = !!token;
       console.log('🔐 Authentication status:', isSignedIn);
       return isSignedIn;
@@ -203,23 +169,39 @@ class GoogleDriveStorageService {
 
     try {
       const folderName = `Gauner-Audio-${userId}`;
+      const accessToken = localStorage.getItem('google_drive_access_token');
       
+      if (!accessToken) {
+        console.error('❌ No access token available');
+        return null;
+      }
+
       // Check if folder already exists
-      const existingFolder = await this.findFolder(folderName);
+      const existingFolder = await this.findFolder(folderName, accessToken);
       if (existingFolder) {
         return existingFolder.id;
       }
 
-      // Create new folder
-      const response = await this.gapi.client.drive.files.create({
-        resource: {
+      // Create new folder using fetch API
+      const response = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
           name: folderName,
           mimeType: 'application/vnd.google-apps.folder'
-        }
+        })
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to create folder: ${response.statusText}`);
+      }
+
+      const result = await response.json();
       console.log('✅ Created user folder:', folderName);
-      return response.result.id;
+      return result.id;
     } catch (error) {
       console.error('❌ Error creating user folder:', error);
       return null;
@@ -227,14 +209,20 @@ class GoogleDriveStorageService {
   }
 
   // Find folder by name
-  private async findFolder(folderName: string): Promise<any> {
+  private async findFolder(folderName: string, accessToken: string): Promise<any> {
     try {
-      const response = await this.gapi.client.drive.files.list({
-        q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder'`,
-        fields: 'files(id, name)'
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${folderName}' and mimeType='application/vnd.google-apps.folder'&fields=files(id,name)`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
       });
 
-      return response.result.files.length > 0 ? response.result.files[0] : null;
+      if (!response.ok) {
+        throw new Error(`Failed to search folder: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      return result.files.length > 0 ? result.files[0] : null;
     } catch (error) {
       console.error('❌ Error finding folder:', error);
       return null;
@@ -277,39 +265,36 @@ class GoogleDriveStorageService {
         };
       }
 
-      // Convert blob to base64
-      const base64Data = await this.blobToBase64(audioFile.blob);
+      const accessToken = localStorage.getItem('google_drive_access_token');
+      if (!accessToken) {
+        return {
+          success: false,
+          error: 'No access token available'
+        };
+      }
 
-      // Upload file to Google Drive using multipart upload
-      const boundary = '-------314159265358979323846';
-      const delimiter = "\r\n--" + boundary + "\r\n";
-      const close_delim = "\r\n--" + boundary + "--";
+      // Upload file to Google Drive using fetch API
+      const formData = new FormData();
+      formData.append('metadata', JSON.stringify({
+        name: audioFile.filename,
+        parents: [folderId]
+      }));
+      formData.append('file', audioFile.blob, audioFile.filename);
 
-      const metadata = {
-        'name': audioFile.filename,
-        'parents': [folderId]
-      };
-
-      const multipartRequestBody =
-        delimiter +
-        'Content-Type: application/json\r\n\r\n' +
-        JSON.stringify(metadata) +
-        delimiter +
-        'Content-Type: audio/wav\r\n\r\n' +
-        base64Data +
-        close_delim;
-
-      const response = await this.gapi.client.request({
-        'path': 'https://www.googleapis.com/upload/drive/v3/files',
-        'method': 'POST',
-        'params': {'uploadType': 'multipart'},
-        'headers': {
-          'Content-Type': 'multipart/related; boundary="' + boundary + '"'
+      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
         },
-        'body': multipartRequestBody
+        body: formData
       });
 
-      const driveFileId = response.id;
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      const driveFileId = result.id;
       const driveUrl = `https://drive.google.com/file/d/${driveFileId}/view`;
 
       const googleDriveAudioFile: GoogleDriveAudioFile = {
@@ -323,6 +308,7 @@ class GoogleDriveStorageService {
 
       // Save metadata to localStorage (since we don't have a database)
       this.saveFileMetadata(googleDriveAudioFile);
+      window.dispatchEvent(new CustomEvent('googleDriveUpdate')); // Notify components of update
 
       console.log('✅ Audio file saved to Google Drive:', {
         userId,
@@ -354,16 +340,26 @@ class GoogleDriveStorageService {
       
       // Verify files still exist in Google Drive
       const verifiedFiles: GoogleDriveAudioFile[] = [];
+      const accessToken = localStorage.getItem('google_drive_access_token');
+      
+      if (!accessToken) {
+        console.warn('⚠️ No access token available for file verification');
+        return metadata;
+      }
       
       for (const file of metadata) {
         try {
-          const response = await this.gapi.client.drive.files.get({
-            fileId: file.driveFileId,
-            fields: 'id, name, size, modifiedTime'
+          const response = await fetch(`https://www.googleapis.com/drive/v3/files/${file.driveFileId}?fields=id,name,size,modifiedTime`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`
+            }
           });
           
-          if (response.result.id) {
+          if (response.ok) {
             verifiedFiles.push(file);
+          } else {
+            console.warn('⚠️ File not found in Google Drive, removing from metadata:', file.filename);
+            this.removeFileMetadata(file.id);
           }
         } catch (error) {
           console.warn('⚠️ File not found in Google Drive, removing from metadata:', file.filename);
@@ -401,12 +397,28 @@ class GoogleDriveStorageService {
       }
 
       // Delete from Google Drive
-      await this.gapi.client.drive.files.delete({
-        fileId: file.driveFileId
+      const accessToken = localStorage.getItem('google_drive_access_token');
+      if (!accessToken) {
+        return {
+          success: false,
+          error: 'No access token available'
+        };
+      }
+
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${file.driveFileId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
       });
+
+      if (!response.ok) {
+        throw new Error(`Delete failed: ${response.statusText}`);
+      }
 
       // Remove from metadata
       this.removeFileMetadata(fileId);
+      window.dispatchEvent(new CustomEvent('googleDriveUpdate')); // Notify components of update
 
       console.log('🗑️ Audio file deleted from Google Drive:', fileId);
       return { success: true };
