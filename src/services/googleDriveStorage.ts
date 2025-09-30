@@ -55,6 +55,17 @@ class GoogleDriveStorageService {
         await this.loadGoogleAPI();
       }
 
+      // Wait for gapi to be available
+      let attempts = 0;
+      while (!window.gapi && attempts < 10) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+
+      if (!window.gapi) {
+        throw new Error('Google API failed to load');
+      }
+
       // Initialize gapi
       console.log('🔧 Loading gapi client...');
       await new Promise((resolve, reject) => {
@@ -110,7 +121,14 @@ class GoogleDriveStorageService {
 
   // Check if Google Drive is ready
   isReady(): boolean {
-    return this.initialized && this.gapi;
+    const ready = this.initialized && this.gapi && window.gapi;
+    console.log('🔍 Google Drive ready check:', {
+      initialized: this.initialized,
+      hasGapi: !!this.gapi,
+      hasWindowGapi: !!window.gapi,
+      ready
+    });
+    return ready;
   }
 
   // Authenticate user
@@ -135,11 +153,16 @@ class GoogleDriveStorageService {
 
   // Check if user is authenticated
   async isAuthenticated(): Promise<boolean> {
-    if (!this.isReady()) return false;
+    if (!this.isReady()) {
+      console.log('❌ Google Drive not ready for authentication check');
+      return false;
+    }
 
     try {
       const authInstance = this.gapi.auth2.getAuthInstance();
-      return authInstance.isSignedIn.get();
+      const isSignedIn = authInstance.isSignedIn.get();
+      console.log('🔐 Authentication status:', isSignedIn);
+      return isSignedIn;
     } catch (error) {
       console.error('❌ Authentication check error:', error);
       return false;
@@ -192,7 +215,10 @@ class GoogleDriveStorageService {
 
   // Save audio file to Google Drive
   async saveAudioFile(userId: string, audioFile: AudioFile): Promise<GoogleDriveStorageResponse> {
+    console.log('💾 Starting Google Drive save for user:', userId);
+    
     if (!this.isReady()) {
+      console.error('❌ Google Drive not ready');
       return {
         success: false,
         error: 'Google Drive not initialized. Please check your configuration.'
@@ -202,8 +228,10 @@ class GoogleDriveStorageService {
     // Check authentication
     const isAuth = await this.isAuthenticated();
     if (!isAuth) {
+      console.log('🔐 User not authenticated, starting authentication...');
       const authSuccess = await this.authenticate();
       if (!authSuccess) {
+        console.error('❌ Authentication failed');
         return {
           success: false,
           error: 'Authentication required. Please sign in to Google Drive.'
