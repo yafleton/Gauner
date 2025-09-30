@@ -1,22 +1,5 @@
 name = "gauner-niche-finder"
 compatibility_date = "2024-01-01"
 
-[env.production]
-route = "your-domain.com/*"
-
-[env.preview]
-route = "preview.your-domain.com/*"
-
-# Static site configuration
-[[env.production.routes]]
-pattern = "your-domain.com/*"
-zone_name = "your-domain.com"
-
-# Build configuration
-[build]
-command = "npm run build"
-cwd = "."
-
 # Pages configuration for static hosting
-[pages]
-build_output_dir = "build"
+pages_build_output_dir = "build"
