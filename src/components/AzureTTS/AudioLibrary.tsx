@@ -1,16 +1,21 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Play, Pause, Download, Trash2, Clock, FileAudio } from 'lucide-react';
+import { Play, Pause, Download, Trash2, Clock, FileAudio, Cloud, Smartphone, Monitor, RefreshCw } from 'lucide-react';
 import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
 import { AudioStorageService, AudioFile } from '../../services/audioStorage';
+import CloudStorageService, { CloudAudioFile } from '../../services/cloudStorage';
 
 const AudioLibrary: React.FC = () => {
   const { user } = useSimpleAuth();
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
+  const [cloudFiles, setCloudFiles] = useState<CloudAudioFile[]>([]);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showCloudFiles, setShowCloudFiles] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const audioStorage = useMemo(() => AudioStorageService.getInstance(), []);
+  const cloudStorage = useMemo(() => CloudStorageService.getInstance(), []);
 
   const loadAudioFiles = useCallback(() => {
     if (!user?.id) return;
@@ -18,8 +23,13 @@ const AudioLibrary: React.FC = () => {
     setIsLoading(true);
     const files = audioStorage.getUserAudioFiles(user.id);
     setAudioFiles(files);
+    
+    // Load cloud files
+    const cloudAudioFiles = cloudStorage.getCloudAudioFiles(user.id);
+    setCloudFiles(cloudAudioFiles);
+    
     setIsLoading(false);
-  }, [user?.id, audioStorage]);
+  }, [user?.id, audioStorage, cloudStorage]);
 
   useEffect(() => {
     if (user?.id) {
@@ -92,6 +102,43 @@ const AudioLibrary: React.FC = () => {
     }
   };
 
+  const handleCloudDelete = async (fileId: string) => {
+    if (!user?.id) return;
+    
+    if (window.confirm('Are you sure you want to delete this cloud audio file?')) {
+      const result = await cloudStorage.deleteAudioFile(user.id, fileId);
+      if (result.success) {
+        loadAudioFiles(); // Reload files after deletion
+        if (playingId === fileId && audioElement) {
+          audioElement.pause();
+          setPlayingId(null);
+          setAudioElement(null);
+        }
+      } else {
+        alert('Failed to delete cloud file: ' + result.error);
+      }
+    }
+  };
+
+  const handleSyncCloud = async () => {
+    if (!user?.id) return;
+    
+    setIsSyncing(true);
+    try {
+      const result = await cloudStorage.syncAudioFiles(user.id);
+      if (result.success) {
+        loadAudioFiles(); // Reload files after sync
+        console.log('✅ Cloud sync completed:', result.data);
+      } else {
+        console.error('❌ Cloud sync failed:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Cloud sync error:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleDeleteAll = async () => {
     if (!user?.id) return;
     
@@ -115,6 +162,11 @@ const AudioLibrary: React.FC = () => {
     return audioStorage.getStorageStats(user.id);
   }, [user?.id, audioStorage]);
 
+  const cloudStats = useMemo(() => {
+    if (!user?.id) return { count: 0, totalSize: 0, devices: [] };
+    return cloudStorage.getCloudStorageStats(user.id);
+  }, [user?.id, cloudStorage]);
+
   if (!user) {
     return (
       <div className="card">
@@ -134,15 +186,42 @@ const AudioLibrary: React.FC = () => {
           <h2 className="text-lg font-semibold text-text-primary">
             Audio Library
           </h2>
-          {audioFiles.length > 0 && (
-            <button
-              onClick={handleDeleteAll}
-              className="text-xs text-red-400 hover:text-red-300 transition-colors"
-            >
-              Clear All
-            </button>
-          )}
+          <div className="flex items-center space-x-2">
+            {cloudFiles.length > 0 && (
+              <button
+                onClick={handleSyncCloud}
+                disabled={isSyncing}
+                className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center space-x-1"
+                title="Sync cloud files"
+              >
+                <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+                <span>Sync</span>
+              </button>
+            )}
+            {audioFiles.length > 0 && (
+              <button
+                onClick={handleDeleteAll}
+                className="text-xs text-red-400 hover:text-red-300 transition-colors"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
         </div>
+        
+        {/* Cloud Storage Toggle */}
+        {cloudFiles.length > 0 && (
+          <div className="mt-2">
+            <button
+              onClick={() => setShowCloudFiles(!showCloudFiles)}
+              className="text-sm text-blue-400 hover:text-blue-300 transition-colors flex items-center space-x-1"
+            >
+              <Cloud size={14} />
+              <span>Cloud Storage ({cloudStats.count} files)</span>
+              <span className="text-xs">({cloudStats.devices.length} devices)</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -161,13 +240,78 @@ const AudioLibrary: React.FC = () => {
         </div>
       )}
 
+      {/* Cloud Files List */}
+      {showCloudFiles && cloudFiles.length > 0 && (
+        <div className="mb-4">
+          <h3 className="text-sm font-medium text-text-primary mb-2 flex items-center space-x-2">
+            <Cloud size={16} />
+            <span>Cloud Storage</span>
+          </h3>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {cloudFiles.map((file) => (
+              <div
+                key={file.id}
+                className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 hover:border-blue-400/50 transition-all duration-200"
+              >
+                <div className="flex items-start space-x-3">
+                  {/* Device Icon */}
+                  <div className="w-8 h-8 bg-blue-600/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    {file.deviceId.includes('mobile') || file.deviceId.includes('phone') ? (
+                      <Smartphone size={12} className="text-blue-400" />
+                    ) : (
+                      <Monitor size={12} className="text-blue-400" />
+                    )}
+                  </div>
+                  
+                  {/* File Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="text-sm font-medium text-text-primary truncate">
+                        {file.name}
+                      </h3>
+                      <span className="text-xs text-text-secondary bg-blue-900/30 px-2 py-0.5 rounded text-nowrap ml-2">
+                        {audioStorage.formatFileSize(file.size)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-3 text-xs text-text-secondary mb-1">
+                      <span className="truncate">Device: {file.deviceId.split('_')[0]}</span>
+                      <span>•</span>
+                      <span>{new Date(file.uploadedAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => handleDownload(file as any)}
+                      className="p-1 text-text-secondary hover:text-accent-purple transition-colors"
+                      title="Download"
+                    >
+                      <Download size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleCloudDelete(file.id)}
+                      className="p-1 text-text-secondary hover:text-red-400 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Audio Files List */}
       {isLoading ? (
         <div className="text-center py-8">
           <div className="loading mx-auto mb-4"></div>
           <p className="text-text-secondary">Loading audio files...</p>
         </div>
-      ) : audioFiles.length === 0 ? (
+      ) : audioFiles.length === 0 && cloudFiles.length === 0 ? (
         <div className="text-center py-8">
           <FileAudio size={48} className="text-text-secondary mx-auto mb-4" />
           <p className="text-text-secondary mb-2">No audio files yet</p>
@@ -175,7 +319,7 @@ const AudioLibrary: React.FC = () => {
             Generate some audio using the Voice tab to see them here
           </p>
         </div>
-      ) : (
+      ) : audioFiles.length > 0 ? (
         <div className="space-y-2 flex-1 overflow-y-auto">
           {audioFiles.map((file) => (
             <div

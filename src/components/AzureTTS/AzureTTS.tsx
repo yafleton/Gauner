@@ -3,8 +3,10 @@ import { Mic, Loader, Save } from 'lucide-react';
 import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
 import { AzureTTSService } from '../../services/azureTTS';
 import { AudioStorageService } from '../../services/audioStorage';
+import CloudStorageService from '../../services/cloudStorage';
 import { AzureVoice } from '../../types';
 import AudioLibrary from './AudioLibrary';
+import { v4 as uuidv4 } from 'uuid';
 
 const AzureTTS: React.FC = () => {
   const { user } = useSimpleAuth();
@@ -19,6 +21,7 @@ const AzureTTS: React.FC = () => {
   const [customFilename, setCustomFilename] = useState('');
 
   const audioStorage = useMemo(() => AudioStorageService.getInstance(), []);
+  const cloudStorage = useMemo(() => CloudStorageService.getInstance(), []);
 
   const ttsService = useMemo(() => {
     // Get API key from user object
@@ -196,6 +199,28 @@ const AzureTTS: React.FC = () => {
               text,
               filename
             );
+
+            // Also save to cloud storage for cross-device access
+            const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            const cloudAudioFile = {
+              id: uuidv4(),
+              name: customFilename.trim() || `audio-${timestamp}`,
+              url: audioUrl,
+              date: new Date().toISOString(),
+              size: audioBlob.size,
+              duration: 0,
+            };
+
+            const cloudResult = await cloudStorage.saveAudioFile(user.id, cloudAudioFile);
+            if (cloudResult.success) {
+              console.log('✅ Audio file saved to cloud storage for cross-device access');
+            } else {
+              console.warn('⚠️ Failed to save to cloud storage:', cloudResult.error);
+            }
+
+            setCustomFilename('');
             setShowSaveSuccess(true);
             setTimeout(() => setShowSaveSuccess(false), 3000);
           }
