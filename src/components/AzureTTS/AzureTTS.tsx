@@ -88,7 +88,94 @@ const AzureTTS: React.FC = () => {
         setSelectedVoice(languageVoices[0].ShortName);
       }
     }
-  }, [voices, selectedLanguage, selectedVoice, getLanguageVoices]);
+  }, [voices, selectedLanguage, selectedVoice]);
+
+  const getLanguageVoices = useCallback(() => {
+    // Map full language names back to codes for filtering
+    const languageCodeMap: { [key: string]: string } = {
+      'English': 'en',
+      'German': 'de',
+      'French': 'fr',
+      'Spanish': 'es',
+      'Italian': 'it',
+      'Portuguese': 'pt',
+      'Russian': 'ru',
+      'Japanese': 'ja',
+      'Korean': 'ko',
+      'Chinese': 'zh',
+      'Arabic': 'ar',
+      'Dutch': 'nl',
+      'Polish': 'pl',
+      'Turkish': 'tr',
+      'Swedish': 'sv',
+      'Norwegian': 'no',
+      'Danish': 'da',
+      'Finnish': 'fi',
+      'Greek': 'el',
+      'Hebrew': 'he',
+      'Hindi': 'hi',
+      'Thai': 'th',
+      'Vietnamese': 'vi',
+      'Indonesian': 'id',
+      'Malay': 'ms',
+      'Filipino': 'fil',
+      'Ukrainian': 'uk',
+      'Czech': 'cs',
+      'Hungarian': 'hu',
+      'Romanian': 'ro',
+      'Bulgarian': 'bg',
+      'Croatian': 'hr',
+      'Slovak': 'sk',
+      'Slovenian': 'sl',
+      'Estonian': 'et',
+      'Latvian': 'lv',
+      'Lithuanian': 'lt',
+      'Icelandic': 'is',
+      'Irish': 'ga',
+      'Welsh': 'cy',
+      'Basque': 'eu',
+      'Catalan': 'ca',
+      'Galician': 'gl',
+      'Maltese': 'mt',
+      'Luxembourgish': 'lb',
+      'Afrikaans': 'af',
+      'Amharic': 'am',
+      'Azerbaijani': 'az',
+      'Bengali': 'bn',
+      'Bosnian': 'bs',
+      'Georgian': 'ka',
+      'Gujarati': 'gu',
+      'Kannada': 'kn',
+      'Kazakh': 'kk',
+      'Khmer': 'km',
+      'Lao': 'lo',
+      'Macedonian': 'mk',
+      'Malayalam': 'ml',
+      'Marathi': 'mr',
+      'Mongolian': 'mn',
+      'Myanmar': 'my',
+      'Nepali': 'ne',
+      'Persian': 'fa',
+      'Punjabi': 'pa',
+      'Serbian': 'sr',
+      'Sinhala': 'si',
+      'Tamil': 'ta',
+      'Telugu': 'te',
+      'Urdu': 'ur',
+      'Uzbek': 'uz',
+      'Yoruba': 'yo',
+      'Zulu': 'zu'
+    };
+    
+    const languageCode = languageCodeMap[selectedLanguage] || selectedLanguage;
+    
+    return voices.filter(voice => {
+      // Extract locale from the Name property
+      const nameMatch = voice.Name?.match(/\(([^,]+),/);
+      const locale = nameMatch ? nameMatch[1] : '';
+      return locale.toLowerCase().startsWith(languageCode.toLowerCase());
+    });
+  }, [voices, selectedLanguage]);
 
   const handleSynthesize = async () => {
     if (!ttsService || !selectedVoice || !text.trim()) {
@@ -137,32 +224,6 @@ const AzureTTS: React.FC = () => {
   };
 
 
-  const getLanguageVoices = useCallback(() => {
-    // Map full language names back to codes for filtering
-    const languageCodeMap: { [key: string]: string } = {
-      'English': 'en',
-      'German': 'de',
-      'French': 'fr',
-      'Italian': 'it',
-      'Spanish': 'es',
-      'Romanian': 'ro',
-      'Portuguese': 'pt',
-      'Dutch': 'nl',
-      'Swedish': 'sv',
-      'Polish': 'pl',
-      'Danish': 'da',
-      'Norwegian': 'no'
-    };
-    
-    const languageCode = languageCodeMap[selectedLanguage] || selectedLanguage;
-    
-    return voices.filter(voice => {
-      // Extract locale from the Name property
-      const nameMatch = voice.Name?.match(/\(([^,]+),/);
-      const locale = nameMatch ? nameMatch[1] : '';
-      return locale.toLowerCase().startsWith(languageCode.toLowerCase());
-    });
-  }, [voices, selectedLanguage]);
 
   const getAvailableLanguages = () => {
     const languageSet = new Set(voices.map(voice => {
