@@ -76,13 +76,17 @@ const AzureTTS: React.FC = () => {
   useEffect(() => {
     const checkGoogleDriveStatus = async () => {
       try {
-        const isReady = await googleDriveStorage.isReady();
+        console.log('🔍 Checking Google Drive status...');
+        const isReady = googleDriveStorage.isReady();
+        console.log('🔍 Google Drive ready:', isReady);
         setIsGoogleDriveReady(isReady);
         
         if (isReady) {
           const isAuth = await googleDriveStorage.isAuthenticated();
+          console.log('🔍 Google Drive authenticated:', isAuth);
           setGoogleDriveAuthStatus(isAuth ? 'authenticated' : 'not-authenticated');
         } else {
+          console.log('🔍 Google Drive not ready, setting status to error');
           setGoogleDriveAuthStatus('error');
         }
       } catch (error) {
@@ -92,6 +96,9 @@ const AzureTTS: React.FC = () => {
     };
 
     checkGoogleDriveStatus();
+    // Poll for status every 5 seconds
+    const interval = setInterval(checkGoogleDriveStatus, 5000);
+    return () => clearInterval(interval);
   }, [googleDriveStorage]);
 
   const getLanguageVoices = useCallback(() => {
