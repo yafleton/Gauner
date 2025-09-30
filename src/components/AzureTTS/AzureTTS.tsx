@@ -4,6 +4,7 @@ import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
 import { AzureTTSService } from '../../services/azureTTS';
 import { AudioStorageService } from '../../services/audioStorage';
 import CloudStorageService from '../../services/cloudStorage';
+import GoogleDriveStorageService from '../../services/googleDriveStorage';
 import { AzureVoice } from '../../types';
 import AudioLibrary from './AudioLibrary';
 import CloudStorageInfo from './CloudStorageInfo';
@@ -26,6 +27,7 @@ const AzureTTS: React.FC = () => {
 
   const audioStorage = useMemo(() => AudioStorageService.getInstance(), []);
   const cloudStorage = useMemo(() => CloudStorageService.getInstance(), []);
+  const googleDriveStorage = useMemo(() => GoogleDriveStorageService.getInstance(), []);
 
   const ttsService = useMemo(() => {
     // Get API key from user object
@@ -221,12 +223,31 @@ const AzureTTS: React.FC = () => {
               deviceId: cloudStorage.getDeviceId(),
             };
 
-            const cloudResult = await cloudStorage.saveAudioFile(user.id, cloudAudioFile);
-            if (cloudResult.success) {
-              console.log('✅ Audio file saved to cloud storage for cross-device access');
-            } else {
-              console.warn('⚠️ Failed to save to cloud storage:', cloudResult.error);
-            }
+                // Save to Google Drive for cross-device access
+                const googleDriveResult = await googleDriveStorage.saveAudioFile(user.id, {
+                  id: uuidv4(),
+                  userId: user.id,
+                  filename: customFilename.trim() || `audio-${timestamp}.wav`,
+                  blob: audioBlob,
+                  createdAt: new Date(),
+                  expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+                  voice: selectedVoice,
+                  text: text.substring(0, 100), // First 100 chars
+                  size: audioBlob.size,
+                });
+                if (googleDriveResult.success) {
+                  console.log('✅ Audio file saved to Google Drive for cross-device access');
+                } else {
+                  console.warn('⚠️ Failed to save to Google Drive:', googleDriveResult.error);
+                  
+                  // Fallback to localStorage-based cloud storage
+                  const cloudResult = await cloudStorage.saveAudioFile(user.id, cloudAudioFile);
+                  if (cloudResult.success) {
+                    console.log('✅ Audio file saved to localStorage cloud storage as fallback');
+                  } else {
+                    console.warn('⚠️ Failed to save to cloud storage:', cloudResult.error);
+                  }
+                }
 
             setCustomFilename('');
             setShowSaveSuccess(true);
