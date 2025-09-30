@@ -24,11 +24,7 @@ const SimpleAdminPanel: React.FC = () => {
   });
   const [creatingUser, setCreatingUser] = useState(false);
 
-  useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
       const allUsers = getAllUsers();
@@ -38,7 +34,11 @@ const SimpleAdminPanel: React.FC = () => {
     } finally {
       setLoadingUsers(false);
     }
-  };
+  }, [getAllUsers]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   const handleCreateUser = async () => {
     if (!newUser.username || !newUser.email || !newUser.password) {

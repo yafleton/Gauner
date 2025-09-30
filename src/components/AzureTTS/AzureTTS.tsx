@@ -137,7 +137,7 @@ const AzureTTS: React.FC = () => {
   };
 
 
-  const getLanguageVoices = () => {
+  const getLanguageVoices = useCallback(() => {
     // Map full language names back to codes for filtering
     const languageCodeMap: { [key: string]: string } = {
       'English': 'en',
@@ -162,7 +162,7 @@ const AzureTTS: React.FC = () => {
       const locale = nameMatch ? nameMatch[1] : '';
       return locale.toLowerCase().startsWith(languageCode.toLowerCase());
     });
-  };
+  }, [voices, selectedLanguage]);
 
   const getAvailableLanguages = () => {
     const languageSet = new Set(voices.map(voice => {

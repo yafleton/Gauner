@@ -5,8 +5,6 @@ import ChannelCard from './ChannelCard';
 import FilterDropdown from './FilterDropdown';
 import { Channel, FilterOptions } from '../../types';
 import { CacheService, CACHE_KEYS } from '../../services/cache';
-import YouTubeApiService from '../../services/youtubeApi';
-import CloudConfigService from '../../services/cloudConfig';
 import TubeChefApiService from '../../services/tubechefApi';
 
 const NicheFinder: React.FC = () => {

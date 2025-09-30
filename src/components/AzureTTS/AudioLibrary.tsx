@@ -12,20 +12,20 @@ const AudioLibrary: React.FC = () => {
 
   const audioStorage = useMemo(() => AudioStorageService.getInstance(), []);
 
-  useEffect(() => {
-    if (user?.id) {
-      loadAudioFiles();
-    }
-  }, [user?.id, loadAudioFiles]);
-
-  const loadAudioFiles = () => {
+  const loadAudioFiles = useCallback(() => {
     if (!user?.id) return;
     
     setIsLoading(true);
     const files = audioStorage.getUserAudioFiles(user.id);
     setAudioFiles(files);
     setIsLoading(false);
-  };
+  }, [user?.id, audioStorage]);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadAudioFiles();
+    }
+  }, [user?.id, loadAudioFiles]);
 
   const handlePlayPause = (file: AudioFile) => {
     if (playingId === file.id) {
@@ -113,7 +113,7 @@ const AudioLibrary: React.FC = () => {
   const stats = useMemo(() => {
     if (!user?.id) return { count: 0, totalSize: 0 };
     return audioStorage.getStorageStats(user.id);
-  }, [user?.id, audioFiles, audioStorage]);
+  }, [user?.id, audioFiles]);
 
   if (!user) {
     return (
