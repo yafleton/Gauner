@@ -3,10 +3,11 @@
 
 import { AudioFile } from './audioStorage';
 
-// Extend Window interface to include gapi
+// Extend Window interface to include gapi and google
 declare global {
   interface Window {
     gapi: any;
+    google: any;
   }
 }
 
@@ -66,10 +67,10 @@ class GoogleDriveStorageService {
         throw new Error('Google API failed to load');
       }
 
-      // Initialize gapi
+      // Initialize gapi with new approach
       console.log('🔧 Loading gapi client...');
       await new Promise((resolve, reject) => {
-        window.gapi.load('client:auth2', {
+        window.gapi.load('client', {
           callback: resolve,
           onerror: reject
         });
@@ -103,19 +104,34 @@ class GoogleDriveStorageService {
         return;
       }
 
-      const script = document.createElement('script');
-      script.src = 'https://apis.google.com/js/api.js';
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        console.log('✅ Google API script loaded');
-        resolve();
+      // Load Google Identity Services first
+      const gisScript = document.createElement('script');
+      gisScript.src = 'https://accounts.google.com/gsi/client';
+      gisScript.async = true;
+      gisScript.defer = true;
+      gisScript.onload = () => {
+        console.log('✅ Google Identity Services loaded');
+        
+        // Then load the API script
+        const apiScript = document.createElement('script');
+        apiScript.src = 'https://apis.google.com/js/api.js';
+        apiScript.async = true;
+        apiScript.defer = true;
+        apiScript.onload = () => {
+          console.log('✅ Google API script loaded');
+          resolve();
+        };
+        apiScript.onerror = () => {
+          console.error('❌ Failed to load Google API script');
+          reject(new Error('Failed to load Google API'));
+        };
+        document.head.appendChild(apiScript);
       };
-      script.onerror = () => {
-        console.error('❌ Failed to load Google API script');
-        reject(new Error('Failed to load Google API'));
+      gisScript.onerror = () => {
+        console.error('❌ Failed to load Google Identity Services');
+        reject(new Error('Failed to load Google Identity Services'));
       };
-      document.head.appendChild(script);
+      document.head.appendChild(gisScript);
     });
   }
 
@@ -140,10 +156,21 @@ class GoogleDriveStorageService {
 
     try {
       console.log('🔐 Starting Google Drive authentication...');
-      const authInstance = this.gapi.auth2.getAuthInstance();
-      const user = await authInstance.signIn();
       
-      console.log('✅ Google Drive authentication successful:', user.getBasicProfile().getName());
+      // Use the new Google Identity Services approach
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: this.CLIENT_ID,
+        scope: this.SCOPES,
+        callback: (response: any) => {
+          console.log('✅ Google Drive authentication successful');
+          this.initialized = true;
+        },
+        error_callback: (error: any) => {
+          console.error('❌ Google Drive authentication error:', error);
+        }
+      });
+
+      tokenClient.requestAccessToken();
       return true;
     } catch (error) {
       console.error('❌ Google Drive authentication error:', error);
@@ -159,8 +186,9 @@ class GoogleDriveStorageService {
     }
 
     try {
-      const authInstance = this.gapi.auth2.getAuthInstance();
-      const isSignedIn = authInstance.isSignedIn.get();
+      // Check if we have a valid access token
+      const token = window.google?.accounts?.oauth2?.getToken();
+      const isSignedIn = !!token;
       console.log('🔐 Authentication status:', isSignedIn);
       return isSignedIn;
     } catch (error) {
