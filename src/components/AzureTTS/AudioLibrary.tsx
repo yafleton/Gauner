@@ -24,10 +24,12 @@ const AudioLibrary: React.FC = () => {
     
     // Load Google Drive files
     try {
+      console.log('🔍 Loading Google Drive files for user:', user.id);
       const googleDriveAudioFiles = await googleDriveStorage.getAudioFiles(user.id);
+      console.log('📁 Google Drive files loaded:', googleDriveAudioFiles.length, googleDriveAudioFiles);
       setGoogleDriveFiles(googleDriveAudioFiles);
     } catch (error) {
-      console.error('Failed to load Google Drive files:', error);
+      console.error('❌ Failed to load Google Drive files:', error);
       setGoogleDriveFiles([]);
     }
     
@@ -54,6 +56,16 @@ const AudioLibrary: React.FC = () => {
       window.removeEventListener('googleDriveUpdate', handleGoogleDriveUpdate);
     };
   }, [loadAudioFiles]);
+
+  // Debug: Log current state
+  useEffect(() => {
+    console.log('🔍 AudioLibrary state update:', {
+      audioFiles: audioFiles.length,
+      googleDriveFiles: googleDriveFiles.length,
+      isLoading,
+      user: user?.id
+    });
+  }, [audioFiles, googleDriveFiles, isLoading, user]);
 
   const handlePlayPause = (file: AudioFile) => {
     if (playingId === file.id) {

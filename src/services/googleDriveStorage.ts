@@ -462,13 +462,16 @@ class GoogleDriveStorageService {
     const existing = this.getFileMetadata(file.userId);
     existing.push(file);
     localStorage.setItem(key, JSON.stringify(existing));
+    console.log('💾 Saved metadata for user', file.userId, ':', existing.length, 'total files');
   }
 
   // Get file metadata from localStorage
   private getFileMetadata(userId: string): GoogleDriveAudioFile[] {
     const key = `gauner_drive_metadata_${userId}`;
     const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
+    const files = data ? JSON.parse(data) : [];
+    console.log('📁 Retrieved metadata for user', userId, ':', files.length, 'files');
+    return files;
   }
 
   // Remove file metadata from localStorage
