@@ -21,32 +21,32 @@ const FirebaseSetup: React.FC = () => {
 
   const setupSteps = [
     {
-      title: "1. Create Firebase Project",
-      description: "Go to Firebase Console and create a new project",
+      title: "1. Firebase-Projekt erstellen",
+      description: "Gehen Sie zur Firebase-Konsole und erstellen Sie ein neues Projekt",
       link: "https://console.firebase.google.com/",
       code: null
     },
     {
-      title: "2. Enable Storage",
-      description: "In your Firebase project, go to Storage and enable it",
+      title: "2. Storage aktivieren",
+      description: "In Ihrem Firebase-Projekt gehen Sie zu Storage und aktivieren es",
       link: null,
       code: null
     },
     {
-      title: "3. Get Web App Config",
-      description: "Add a web app to your project and copy the config",
+      title: "3. Web-App-Konfiguration abrufen",
+      description: "Fügen Sie eine Web-App zu Ihrem Projekt hinzu und kopieren Sie die Konfiguration",
       link: null,
       code: JSON.stringify(firebaseConfig, null, 2)
     },
     {
-      title: "4. Install Firebase",
-      description: "Install Firebase SDK in your project",
+      title: "4. Firebase installieren",
+      description: "Installieren Sie das Firebase SDK in Ihrem Projekt",
       link: null,
       code: "npm install firebase"
     },
     {
-      title: "5. Update Config",
-      description: "Replace the config in firebaseStorage.ts with your actual values",
+      title: "5. Konfiguration aktualisieren",
+      description: "Ersetzen Sie die Konfiguration in firebaseStorage.ts mit Ihren tatsächlichen Werten",
       link: null,
       code: null
     }
@@ -77,7 +77,7 @@ service cloud.firestore {
     <div className="card p-6">
       <div className="flex items-center space-x-3 mb-6">
         <Cloud size={24} className="text-blue-400" />
-        <h2 className="text-xl font-semibold text-text-primary">Firebase Storage Setup</h2>
+        <h2 className="text-xl font-semibold text-text-primary">Firebase Storage Einrichtung</h2>
       </div>
 
       <div className="space-y-6">
@@ -86,13 +86,13 @@ service cloud.firestore {
           <div className="flex items-start space-x-3">
             <CheckCircle size={20} className="text-green-400 mt-0.5" />
             <div>
-              <h3 className="text-green-300 font-medium mb-2">Why Firebase Storage?</h3>
+              <h3 className="text-green-300 font-medium mb-2">Warum Firebase Storage?</h3>
               <ul className="text-green-200 text-sm space-y-1">
-                <li>• <strong>5 GB free storage</strong> - Perfect for audio files</li>
-                <li>• <strong>Real-time sync</strong> - Files appear instantly on all devices</li>
-                <li>• <strong>Easy integration</strong> - Simple JavaScript SDK</li>
-                <li>• <strong>Secure</strong> - Built-in authentication and security rules</li>
-                <li>• <strong>Scalable</strong> - Grows with your needs</li>
+                <li>• <strong>5 GB kostenloser Speicher</strong> - Perfekt für Audio-Dateien</li>
+                <li>• <strong>Echtzeit-Synchronisation</strong> - Dateien erscheinen sofort auf allen Geräten</li>
+                <li>• <strong>Einfache Integration</strong> - Einfaches JavaScript SDK</li>
+                <li>• <strong>Sicher</strong> - Eingebaute Authentifizierung und Sicherheitsregeln</li>
+                <li>• <strong>Skalierbar</strong> - Wächst mit Ihren Bedürfnissen</li>
               </ul>
             </div>
           </div>
@@ -100,7 +100,7 @@ service cloud.firestore {
 
         {/* Setup Steps */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-text-primary">Setup Steps</h3>
+          <h3 className="text-lg font-semibold text-text-primary">Einrichtungsschritte</h3>
           {setupSteps.map((step, index) => (
             <div key={index} className="bg-bg-secondary/30 rounded-lg p-4">
               <div className="flex items-start justify-between">
@@ -115,7 +115,7 @@ service cloud.firestore {
                       className="inline-flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-sm"
                     >
                       <ExternalLink size={14} />
-                      <span>Open Link</span>
+                      <span>Link öffnen</span>
                     </a>
                   )}
                 </div>
@@ -123,7 +123,7 @@ service cloud.firestore {
                   <button
                     onClick={() => copyToClipboard(step.code, `step-${index}`)}
                     className="ml-4 p-2 text-text-secondary hover:text-text-primary transition-colors"
-                    title="Copy code"
+                    title="Code kopieren"
                   >
                     {copied === `step-${index}` ? (
                       <CheckCircle size={16} className="text-green-400" />
@@ -144,15 +144,15 @@ service cloud.firestore {
 
         {/* Security Rules */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-text-primary">Security Rules</h3>
+          <h3 className="text-lg font-semibold text-text-primary">Sicherheitsregeln</h3>
           
           <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
             <div className="flex items-start space-x-3">
               <AlertCircle size={20} className="text-yellow-400 mt-0.5" />
               <div>
-                <h4 className="text-yellow-300 font-medium mb-2">Storage Rules</h4>
+                <h4 className="text-yellow-300 font-medium mb-2">Storage-Regeln</h4>
                 <p className="text-yellow-200 text-sm mb-3">
-                  Add these rules to your Firebase Storage to ensure users can only access their own files.
+                  Fügen Sie diese Regeln zu Ihrem Firebase Storage hinzu, damit Benutzer nur auf ihre eigenen Dateien zugreifen können.
                 </p>
                 <button
                   onClick={() => copyToClipboard(storageRules, 'storage-rules')}
@@ -163,7 +163,7 @@ service cloud.firestore {
                   ) : (
                     <Copy size={14} />
                   )}
-                  <span>Copy Storage Rules</span>
+                  <span>Storage-Regeln kopieren</span>
                 </button>
               </div>
             </div>
@@ -173,9 +173,9 @@ service cloud.firestore {
             <div className="flex items-start space-x-3">
               <AlertCircle size={20} className="text-yellow-400 mt-0.5" />
               <div>
-                <h4 className="text-yellow-300 font-medium mb-2">Firestore Rules</h4>
+                <h4 className="text-yellow-300 font-medium mb-2">Firestore-Regeln</h4>
                 <p className="text-yellow-200 text-sm mb-3">
-                  Add these rules to your Firestore database for metadata security.
+                  Fügen Sie diese Regeln zu Ihrer Firestore-Datenbank für Metadaten-Sicherheit hinzu.
                 </p>
                 <button
                   onClick={() => copyToClipboard(firestoreRules, 'firestore-rules')}
@@ -186,7 +186,7 @@ service cloud.firestore {
                   ) : (
                     <Copy size={14} />
                   )}
-                  <span>Copy Firestore Rules</span>
+                  <span>Firestore-Regeln kopieren</span>
                 </button>
               </div>
             </div>
@@ -198,12 +198,12 @@ service cloud.firestore {
           <div className="flex items-start space-x-3">
             <Cloud size={20} className="text-blue-400 mt-0.5" />
             <div>
-              <h4 className="text-blue-300 font-medium mb-2">After Setup</h4>
+              <h4 className="text-blue-300 font-medium mb-2">Nach der Einrichtung</h4>
               <ul className="text-blue-200 text-sm space-y-1">
-                <li>• Replace the config in <code>src/services/firebaseStorage.ts</code></li>
-                <li>• Update <code>CloudStorageService</code> to use <code>FirebaseStorageService</code></li>
-                <li>• Test by generating audio on one device and checking another</li>
-                <li>• Files will sync in real-time across all devices</li>
+                <li>• Ersetzen Sie die Konfiguration in <code>src/services/firebaseStorage.ts</code></li>
+                <li>• Aktualisieren Sie <code>CloudStorageService</code> um <code>FirebaseStorageService</code> zu verwenden</li>
+                <li>• Testen Sie, indem Sie Audio auf einem Gerät generieren und auf einem anderen überprüfen</li>
+                <li>• Dateien werden in Echtzeit auf allen Geräten synchronisiert</li>
               </ul>
             </div>
           </div>
@@ -218,7 +218,7 @@ service cloud.firestore {
             className="inline-flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-sm"
           >
             <ExternalLink size={14} />
-            <span>Firebase Console</span>
+            <span>Firebase-Konsole</span>
           </a>
           <a
             href="https://firebase.google.com/docs/storage"
@@ -227,7 +227,7 @@ service cloud.firestore {
             className="inline-flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-sm"
           >
             <ExternalLink size={14} />
-            <span>Firebase Storage Docs</span>
+            <span>Firebase Storage Dokumentation</span>
           </a>
           <a
             href="https://firebase.google.com/docs/firestore"
@@ -236,7 +236,7 @@ service cloud.firestore {
             className="inline-flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-sm"
           >
             <ExternalLink size={14} />
-            <span>Firestore Docs</span>
+            <span>Firestore Dokumentation</span>
           </a>
         </div>
       </div>
