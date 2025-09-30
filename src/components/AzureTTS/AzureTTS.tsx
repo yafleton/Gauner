@@ -202,15 +202,19 @@ const AzureTTS: React.FC = () => {
 
             // Also save to cloud storage for cross-device access
             const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
-            const audioUrl = URL.createObjectURL(audioBlob);
             
             const cloudAudioFile = {
               id: uuidv4(),
-              name: customFilename.trim() || `audio-${timestamp}`,
-              url: audioUrl,
-              date: new Date().toISOString(),
+              userId: user.id,
+              filename: customFilename.trim() || `audio-${timestamp}.wav`,
+              blob: audioBlob,
+              createdAt: new Date(),
+              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+              voice: selectedVoice,
+              text: text.substring(0, 100), // First 100 chars
               size: audioBlob.size,
-              duration: 0,
+              uploadedAt: new Date().toISOString(),
+              deviceId: cloudStorage.getDeviceId(),
             };
 
             const cloudResult = await cloudStorage.saveAudioFile(user.id, cloudAudioFile);

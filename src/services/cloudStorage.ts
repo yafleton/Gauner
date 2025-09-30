@@ -1,4 +1,4 @@
-import { AudioFile } from '../types';
+import { AudioFile } from './audioStorage';
 
 interface CloudAudioFile extends AudioFile {
   userId: string;
@@ -63,7 +63,7 @@ class CloudStorageService {
       
       console.log('✅ Audio file saved to cloud storage:', {
         userId,
-        fileName: audioFile.name,
+        fileName: audioFile.filename,
         deviceId: this.getDeviceId(),
         totalFiles: existingFiles.length
       });

@@ -267,7 +267,7 @@ const AudioLibrary: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
                       <h3 className="text-sm font-medium text-text-primary truncate">
-                        {file.name}
+                        {file.filename}
                       </h3>
                       <span className="text-xs text-text-secondary bg-blue-900/30 px-2 py-0.5 rounded text-nowrap ml-2">
                         {audioStorage.formatFileSize(file.size)}
@@ -386,7 +386,7 @@ const AudioLibrary: React.FC = () => {
             </div>
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
