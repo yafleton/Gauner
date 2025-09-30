@@ -51,24 +51,24 @@ class GoogleDriveStorageService {
       console.log('🔄 Initializing Google Drive API...');
       
       // Load Google Identity Services
-      if (!window.google) {
-        console.log('📥 Loading Google Identity Services...');
-        await this.loadGoogleIdentityServices();
-      }
+      console.log('📥 Loading Google Identity Services...');
+      await this.loadGoogleIdentityServices();
 
       // Wait for google to be available
       let attempts = 0;
-      while (!window.google && attempts < 10) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      while (!window.google && attempts < 20) {
+        console.log(`⏳ Waiting for Google Identity Services... attempt ${attempts + 1}/20`);
+        await new Promise(resolve => setTimeout(resolve, 500));
         attempts++;
       }
 
       if (!window.google) {
-        throw new Error('Google Identity Services failed to load');
+        throw new Error('Google Identity Services failed to load after 20 attempts');
       }
 
+      console.log('✅ Google Identity Services loaded:', !!window.google);
       this.initialized = true;
-      console.log('✅ Google Identity Services initialized successfully');
+      console.log('✅ Google Drive API initialized successfully');
     } catch (error) {
       console.error('❌ Google Drive initialization error:', error);
       this.initialized = false;
@@ -79,24 +79,30 @@ class GoogleDriveStorageService {
   private loadGoogleIdentityServices(): Promise<void> {
     return new Promise((resolve, reject) => {
       // Check if script already exists
-      if (document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
+      const existingScript = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
+      if (existingScript) {
+        console.log('📋 Google Identity Services script already exists');
         resolve();
         return;
       }
 
+      console.log('📥 Creating Google Identity Services script...');
+      
       // Load Google Identity Services
       const gisScript = document.createElement('script');
       gisScript.src = 'https://accounts.google.com/gsi/client';
       gisScript.async = true;
       gisScript.defer = true;
       gisScript.onload = () => {
-        console.log('✅ Google Identity Services loaded');
+        console.log('✅ Google Identity Services script loaded successfully');
         resolve();
       };
-      gisScript.onerror = () => {
-        console.error('❌ Failed to load Google Identity Services');
+      gisScript.onerror = (error) => {
+        console.error('❌ Failed to load Google Identity Services script:', error);
         reject(new Error('Failed to load Google Identity Services'));
       };
+      
+      console.log('📤 Adding Google Identity Services script to document head...');
       document.head.appendChild(gisScript);
     });
   }
