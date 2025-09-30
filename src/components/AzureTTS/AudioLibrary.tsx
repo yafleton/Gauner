@@ -41,17 +41,17 @@ const AudioLibrary: React.FC = () => {
     }
   }, [user?.id, loadAudioFiles]);
 
-  // Listen for cloud storage updates
+  // Listen for Google Drive updates
   useEffect(() => {
-    const handleCloudUpdate = () => {
-      console.log('📱 Cloud storage update received, reloading files...');
+    const handleGoogleDriveUpdate = () => {
+      console.log('📱 Google Drive update received, reloading files...');
       loadAudioFiles();
     };
 
-    window.addEventListener('cloudStorageUpdate', handleCloudUpdate);
+    window.addEventListener('googleDriveUpdate', handleGoogleDriveUpdate);
     
     return () => {
-      window.removeEventListener('cloudStorageUpdate', handleCloudUpdate);
+      window.removeEventListener('googleDriveUpdate', handleGoogleDriveUpdate);
     };
   }, [loadAudioFiles]);
 
