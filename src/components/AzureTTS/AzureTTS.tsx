@@ -21,23 +21,9 @@ const AzureTTS: React.FC = () => {
   const audioStorage = useMemo(() => AudioStorageService.getInstance(), []);
 
   const ttsService = useMemo(() => {
-    // Get API key from localStorage using user ID
-    const getAzureApiKey = () => {
-      if (!user?.id) return null;
-      const key = localStorage.getItem(`azure_api_key_${user.id}`);
-      console.log('AzureTTS: Retrieved API key from localStorage:', key ? `${key.substring(0, 8)}...` : 'none');
-      return key;
-    };
-
-    const getAzureRegion = () => {
-      if (!user?.id) return 'eastus';
-      const region = localStorage.getItem(`azure_region_${user.id}`) || 'eastus';
-      console.log('AzureTTS: Retrieved region from localStorage:', region);
-      return region;
-    };
-
-    const currentApiKey = getAzureApiKey();
-    const currentRegion = getAzureRegion();
+    // Get API key from user object
+    const currentApiKey = user?.azureApiKey;
+    const currentRegion = user?.azureRegion || 'eastus';
     
     console.log('AzureTTS: Creating service with:', {
       userId: user?.id,
@@ -48,7 +34,7 @@ const AzureTTS: React.FC = () => {
     
     // Always create service, even without API key (for voices)
     return new AzureTTSService(currentApiKey || 'demo-key', currentRegion);
-  }, [user?.id]);
+  }, [user?.azureApiKey, user?.azureRegion]);
 
   const loadVoices = useCallback(async () => {
     if (!ttsService) return;
@@ -267,9 +253,8 @@ const AzureTTS: React.FC = () => {
 
   // Check if API key is available for synthesis
   const hasApiKey = useMemo(() => {
-    if (!user?.id) return false;
-    return !!localStorage.getItem(`azure_api_key_${user.id}`);
-  }, [user?.id]);
+    return !!user?.azureApiKey;
+  }, [user?.azureApiKey]);
 
   return (
     <div className="p-8">
