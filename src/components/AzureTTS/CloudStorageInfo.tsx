@@ -38,10 +38,10 @@ const CloudStorageInfo: React.FC = () => {
                 To enable true cross-device sync, we need to integrate with a cloud storage service:
               </p>
               <ul className="text-blue-200 text-sm space-y-1 ml-4">
-                <li>• <strong>Firebase Storage</strong> - 5GB free, real-time sync ⭐ RECOMMENDED</li>
+                <li>• <strong>Google Drive API</strong> - 15GB free, no credit card required ⭐ RECOMMENDED</li>
+                <li>• <strong>Firebase Storage</strong> - 5GB free, real-time sync</li>
                 <li>• <strong>Supabase</strong> - 500MB free, open source</li>
                 <li>• <strong>AWS S3</strong> - 5GB free, enterprise-grade</li>
-                <li>• <strong>Google Drive API</strong> - 15GB free, familiar interface</li>
                 <li>• <strong>pCloud</strong> - 10GB free, simple integration</li>
               </ul>
             </div>
@@ -96,7 +96,7 @@ const CloudStorageInfo: React.FC = () => {
                   <div className="text-purple-200"><strong>AWS S3:</strong> 5GB storage, 20K requests</div>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-purple-200"><strong>Google Drive:</strong> 15GB storage</div>
+                  <div className="text-purple-200"><strong>Google Drive:</strong> 15GB storage, no credit card</div>
                   <div className="text-purple-200"><strong>pCloud:</strong> 10GB storage</div>
                   <div className="text-purple-200"><strong>OneDrive:</strong> 5GB storage</div>
                 </div>
@@ -124,6 +124,24 @@ const CloudStorageInfo: React.FC = () => {
           >
             <ExternalLink size={14} />
             <span>Firebase Storage</span>
+          </a>
+          <a
+            href="https://console.cloud.google.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-sm"
+          >
+            <ExternalLink size={14} />
+            <span>Google Cloud Console</span>
+          </a>
+          <a
+            href="https://developers.google.com/drive/api"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-sm"
+          >
+            <ExternalLink size={14} />
+            <span>Google Drive API</span>
           </a>
           <a
             href="https://supabase.com/docs/guides/storage"
