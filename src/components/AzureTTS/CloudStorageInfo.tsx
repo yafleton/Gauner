@@ -38,11 +38,11 @@ const CloudStorageInfo: React.FC = () => {
                 To enable true cross-device sync, we need to integrate with a cloud storage service:
               </p>
               <ul className="text-blue-200 text-sm space-y-1 ml-4">
-                <li>• <strong>Firebase Storage</strong> + Firestore (Google)</li>
-                <li>• <strong>AWS S3</strong> + DynamoDB (Amazon)</li>
-                <li>• <strong>Google Cloud Storage</strong> + Firestore</li>
-                <li>• <strong>Azure Blob Storage</strong> + Cosmos DB (Microsoft)</li>
-                <li>• <strong>Supabase Storage</strong> + Database (Open Source)</li>
+                <li>• <strong>Firebase Storage</strong> - 5GB free, real-time sync ⭐ RECOMMENDED</li>
+                <li>• <strong>Supabase</strong> - 500MB free, open source</li>
+                <li>• <strong>AWS S3</strong> - 5GB free, enterprise-grade</li>
+                <li>• <strong>Google Drive API</strong> - 15GB free, familiar interface</li>
+                <li>• <strong>pCloud</strong> - 10GB free, simple integration</li>
               </ul>
             </div>
           </div>
@@ -83,8 +83,39 @@ const CloudStorageInfo: React.FC = () => {
           </div>
         </div>
 
+        {/* Free Tier Comparison */}
+        <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <Info size={20} className="text-purple-400 mt-0.5" />
+            <div>
+              <h4 className="text-purple-300 font-medium mb-2">Free Tier Comparison</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div className="space-y-1">
+                  <div className="text-purple-200"><strong>Firebase:</strong> 5GB storage, 1GB/day downloads</div>
+                  <div className="text-purple-200"><strong>Supabase:</strong> 500MB storage, 2GB bandwidth</div>
+                  <div className="text-purple-200"><strong>AWS S3:</strong> 5GB storage, 20K requests</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-purple-200"><strong>Google Drive:</strong> 15GB storage</div>
+                  <div className="text-purple-200"><strong>pCloud:</strong> 10GB storage</div>
+                  <div className="text-purple-200"><strong>OneDrive:</strong> 5GB storage</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Links */}
         <div className="flex flex-wrap gap-2 pt-2">
+          <a
+            href="https://console.firebase.google.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-sm"
+          >
+            <ExternalLink size={14} />
+            <span>Firebase Console</span>
+          </a>
           <a
             href="https://firebase.google.com/docs/storage"
             target="_blank"
@@ -93,15 +124,6 @@ const CloudStorageInfo: React.FC = () => {
           >
             <ExternalLink size={14} />
             <span>Firebase Storage</span>
-          </a>
-          <a
-            href="https://aws.amazon.com/s3/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-sm"
-          >
-            <ExternalLink size={14} />
-            <span>AWS S3</span>
           </a>
           <a
             href="https://supabase.com/docs/guides/storage"

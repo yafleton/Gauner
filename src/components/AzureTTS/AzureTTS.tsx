@@ -7,6 +7,7 @@ import CloudStorageService from '../../services/cloudStorage';
 import { AzureVoice } from '../../types';
 import AudioLibrary from './AudioLibrary';
 import CloudStorageInfo from './CloudStorageInfo';
+import FirebaseSetup from './FirebaseSetup';
 import { v4 as uuidv4 } from 'uuid';
 
 const AzureTTS: React.FC = () => {
@@ -20,7 +21,7 @@ const AzureTTS: React.FC = () => {
   const [error, setError] = useState('');
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [customFilename, setCustomFilename] = useState('');
-  const [activeTab, setActiveTab] = useState<'generate' | 'library' | 'cloud-info'>('generate');
+  const [activeTab, setActiveTab] = useState<'generate' | 'library' | 'cloud-info' | 'firebase-setup'>('generate');
 
   const audioStorage = useMemo(() => AudioStorageService.getInstance(), []);
   const cloudStorage = useMemo(() => CloudStorageService.getInstance(), []);
@@ -336,6 +337,17 @@ const AzureTTS: React.FC = () => {
             <Info size={18} />
             <span>Cloud Info</span>
           </button>
+          <button
+            onClick={() => setActiveTab('firebase-setup')}
+            className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-md transition-colors ${
+              activeTab === 'firebase-setup'
+                ? 'bg-accent-purple text-white'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50'
+            }`}
+          >
+            <Cloud size={18} />
+            <span>Firebase Setup</span>
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -518,6 +530,12 @@ const AzureTTS: React.FC = () => {
         {activeTab === 'cloud-info' && (
           <div className="max-w-4xl mx-auto">
             <CloudStorageInfo />
+          </div>
+        )}
+
+        {activeTab === 'firebase-setup' && (
+          <div className="max-w-4xl mx-auto">
+            <FirebaseSetup />
           </div>
         )}
       </div>
