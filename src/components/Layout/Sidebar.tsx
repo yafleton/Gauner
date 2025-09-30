@@ -1,0 +1,94 @@
+import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { 
+  Home, 
+  Search, 
+  Mic, 
+  Settings,
+  LogOut,
+  User
+} from 'lucide-react';
+import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
+
+const Sidebar: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, logout } = useSimpleAuth();
+
+  const menuItems = [
+    { id: 'home', label: 'Home', icon: Home, path: '/' },
+    { id: 'niche-finder', label: 'Niche Finder', icon: Search, path: '/niche-finder' },
+    { id: 'azure-tts', label: 'Voice', icon: Mic, path: '/azure-tts' },
+    { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
+  ];
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  return (
+    <div className="w-64 bg-dark-sidebar h-screen flex flex-col border-r border-border-dark">
+      {/* Logo */}
+      <div className="p-6 border-b border-border-dark">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-gradient-to-br from-accent-purple to-accent-blue rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-lg">G</span>
+          </div>
+          <span className="text-xl font-bold text-text-primary">Gauner</span>
+        </div>
+      </div>
+
+      {/* Navigation Menu */}
+      <nav className="flex-1 p-4">
+        <ul className="space-y-2">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path;
+            
+            return (
+              <li key={item.id}>
+                <button
+                  onClick={() => navigate(item.path)}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all duration-200 ${
+                    isActive
+                      ? 'bg-gradient-to-r from-accent-purple to-accent-blue text-white'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-dark-card'
+                  }`}
+                >
+                  <Icon size={20} />
+                  <span className="font-medium">{item.label}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      {/* User Info */}
+      <div className="p-4 border-t border-border-dark">
+        <div className="flex items-center space-x-3 mb-4">
+          <div className="w-8 h-8 bg-dark-card rounded-full flex items-center justify-center">
+            <User size={16} className="text-text-secondary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-text-primary truncate">
+              {user?.username || 'Guest'}
+            </p>
+            <p className="text-xs text-text-secondary">user</p>
+          </div>
+        </div>
+        
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
+        >
+          <LogOut size={16} />
+          <span className="text-sm font-medium">Sign Out</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default Sidebar;
