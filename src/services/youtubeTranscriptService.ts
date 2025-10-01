@@ -74,7 +74,15 @@ export class YouTubeTranscriptService {
 
     // Try to extract transcript using multiple methods
     try {
-      const transcript = await this.fetchTranscriptFromProxy(videoId);
+      let transcript: string;
+      
+      // First try backend service (most reliable)
+      try {
+        transcript = await this.fetchTranscriptFromBackend(videoId);
+      } catch (backendError) {
+        console.log('🔄 Backend service unavailable, trying proxy methods...');
+        transcript = await this.fetchTranscriptFromProxy(videoId);
+      }
       
       if (!transcript || transcript.trim().length < 10) {
         throw new Error('Transcript is too short or empty');
@@ -186,6 +194,42 @@ export class YouTubeTranscriptService {
     // If CORS proxies fail, try direct public transcript services
     console.log('🔄 CORS proxies failed, trying direct public services...');
     return this.fetchTranscriptFromPublicServices(videoId);
+  }
+
+  // Try backend service first (most reliable)
+  private async fetchTranscriptFromBackend(videoId: string): Promise<string> {
+    try {
+      console.log('🔍 Trying backend yt-dlp service for video:', videoId);
+      
+      const response = await fetch('http://localhost:3001/api/transcript', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ videoId })
+      });
+      
+      console.log('📡 Backend response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📄 Backend response data:', { success: data.success, transcriptLength: data.transcript?.length });
+        
+        if (data.success && data.transcript) {
+          console.log('✅ Successfully extracted transcript from backend yt-dlp service');
+          return data.transcript;
+        } else {
+          throw new Error(data.error || 'Backend service failed');
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Backend service error:', response.status, errorText);
+        throw new Error(`Backend service error: ${response.status} - ${errorText}`);
+      }
+    } catch (error) {
+      console.warn('❌ Backend yt-dlp service failed:', error);
+      throw error;
+    }
   }
 
   // Try public transcript services that don't require CORS
@@ -351,6 +395,36 @@ export class YouTubeTranscriptService {
       }
     } catch (error) {
       console.warn('❌ Alternative transcript service failed:', error);
+    }
+
+    // Try one more approach - use a public API that runs yt-dlp
+    try {
+      console.log('🔍 Trying public yt-dlp API service...');
+      
+      // Use a public API that actually runs yt-dlp
+      const ytdlpApiUrl = `https://api.smmry.com/youtube-transcript/${videoId}`;
+      
+      const response = await fetch(ytdlpApiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json, text/plain, */*',
+        }
+      });
+      
+      if (response.ok) {
+        const text = await response.text();
+        console.log('📄 Got response from yt-dlp API:', text.substring(0, 100) + '...');
+        
+        if (text && text.trim().length > 0) {
+          const parsedTranscript = this.parseTranscriptText(text);
+          if (parsedTranscript.trim().length > 10) {
+            console.log('✅ Successfully extracted transcript from yt-dlp API');
+            return parsedTranscript;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('❌ yt-dlp API service failed:', error);
     }
 
     // If all else fails, try HTML parsing approach
