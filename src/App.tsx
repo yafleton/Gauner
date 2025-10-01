@@ -6,6 +6,7 @@ import SimpleAuth from './components/SimpleAuth';
 import Home from './components/Home/Home';
 import NicheFinder from './components/NicheFinder/NicheFinder';
 import AzureTTS from './components/AzureTTS/AzureTTS';
+import YouTube from './components/YouTube/YouTube';
 import Settings from './components/Settings/Settings';
 import ChannelVideos from './components/ChannelVideos/ChannelVideos';
 
@@ -48,6 +49,7 @@ const AppRoutes: React.FC = () => {
           <Route index element={<Home />} />
           <Route path="niche-finder" element={<NicheFinder />} />
           <Route path="azure-tts" element={<AzureTTS />} />
+          <Route path="youtube" element={<YouTube />} />
           <Route path="settings" element={<Settings />} />
           <Route path="channel/:channelId/videos" element={<ChannelVideos />} />
         </Route>
