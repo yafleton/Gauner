@@ -379,9 +379,6 @@ const AzureTTS: React.FC = () => {
       setShowSaveSuccess(false);
     }
 
-            setCustomFilename('');
-          }
-
     } catch (error) {
       setError('Failed to synthesize speech. Please check your API key and try again.');
       console.error('Error synthesizing speech:', error);
