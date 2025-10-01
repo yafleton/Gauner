@@ -110,45 +110,45 @@ async function findOrCreateUserFolder(accessToken, userId) {
 }
 
 async function uploadToGoogleDrive(accessToken, folderId, audioFile, filename, metadata) {
-  // Create file metadata
+  // First, upload the file without metadata
+  const uploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files?uploadType=media`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'audio/mp3'
+    },
+    body: audioFile
+  })
+
+  if (!uploadResponse.ok) {
+    const errorText = await uploadResponse.text()
+    throw new Error(`File upload failed: ${uploadResponse.status} - ${errorText}`)
+  }
+
+  const uploadResult = await uploadResponse.json()
+  const fileId = uploadResult.id
+
+  // Then, update the file with metadata
   const fileMetadata = {
     name: filename,
     parents: [folderId],
     description: JSON.stringify(metadata)
   }
 
-  // Create multipart upload
-  const boundary = '----formdata-boundary-' + Math.random().toString(36)
-  const formData = [
-    `--${boundary}`,
-    'Content-Disposition: form-data; name="metadata"',
-    'Content-Type: application/json',
-    '',
-    JSON.stringify(fileMetadata),
-    `--${boundary}`,
-    `Content-Disposition: form-data; name="media"; filename="${filename}"`,
-    'Content-Type: audio/mp3',
-    '',
-    audioFile,
-    `--${boundary}--`
-  ].join('\r\n')
-
-  const uploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`, {
-    method: 'POST',
+  const updateResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+    method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': `multipart/related; boundary=${boundary}`
+      'Content-Type': 'application/json'
     },
-    body: formData
+    body: JSON.stringify(fileMetadata)
   })
 
-  if (!uploadResponse.ok) {
-    const errorText = await uploadResponse.text()
-    throw new Error(`Google Drive upload failed: ${uploadResponse.status} - ${errorText}`)
+  if (!updateResponse.ok) {
+    const errorText = await updateResponse.text()
+    throw new Error(`Metadata update failed: ${updateResponse.status} - ${errorText}`)
   }
 
-  const uploadResult = await uploadResponse.json()
-  const fileId = uploadResult.id
   const driveUrl = `https://drive.google.com/file/d/${fileId}/view`
 
   return {
