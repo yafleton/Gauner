@@ -354,23 +354,28 @@ const AzureTTS: React.FC = () => {
               size: audioBlob.size,
             };
 
-    // Save ONLY to Google Drive (no localStorage fallback)
+    // Try to save to Google Drive (optional - don't fail if it doesn't work)
     if (isGoogleDriveReady && googleDriveAuthStatus === 'authenticated') {
-      console.log('🔄 Uploading to Google Drive...');
-      const googleDriveResult = await googleDriveStorage.saveAudioFile(user.id, audioFile);
-      
-      if (googleDriveResult.success) {
-        console.log('✅ Audio file saved to Google Drive for cross-device access');
-        setShowSaveSuccess(true);
-        setTimeout(() => setShowSaveSuccess(false), 3000);
-      } else {
-        console.error('❌ Failed to save to Google Drive:', googleDriveResult.error);
-        setError(`Failed to save audio to Google Drive: ${googleDriveResult.error}`);
+      console.log('🔄 Attempting to upload to Google Drive...');
+      try {
+        const googleDriveResult = await googleDriveStorage.saveAudioFile(user.id, audioFile);
+        
+        if (googleDriveResult.success) {
+          console.log('✅ Audio file saved to Google Drive for cross-device access');
+          setShowSaveSuccess(true);
+          setTimeout(() => setShowSaveSuccess(false), 3000);
+        } else {
+          console.warn('⚠️ Google Drive save failed, but continuing:', googleDriveResult.error);
+          // Don't show error to user - Google Drive is optional
+          setShowSaveSuccess(false);
+        }
+      } catch (error) {
+        console.warn('⚠️ Google Drive save failed, but continuing:', error);
+        // Don't show error to user - Google Drive is optional
         setShowSaveSuccess(false);
       }
     } else {
-      console.error('❌ Google Drive not ready or not authenticated');
-      setError('Google Drive not connected. Please connect to Google Drive to save audio files.');
+      console.log('ℹ️ Google Drive not available - audio generated successfully without cloud save');
       setShowSaveSuccess(false);
     }
 
