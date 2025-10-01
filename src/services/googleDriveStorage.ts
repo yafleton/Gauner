@@ -337,9 +337,8 @@ class GoogleDriveStorageService {
       // Save metadata to Google Drive for cross-device sync
       await this.saveMetadataToDrive(googleDriveAudioFile, accessToken);
       
-      // Also save to localStorage as backup
-      this.saveFileMetadata(googleDriveAudioFile);
-      window.dispatchEvent(new CustomEvent('googleDriveUpdate')); // Notify components of update
+      // Notify components of update
+      window.dispatchEvent(new CustomEvent('googleDriveUpdate'));
 
       console.log('✅ Audio file saved to Google Drive:', {
         userId,
@@ -368,8 +367,8 @@ class GoogleDriveStorageService {
     try {
       const accessToken = localStorage.getItem('google_drive_access_token');
       if (!accessToken) {
-        console.warn('⚠️ No access token available for file verification');
-        return this.getFileMetadata(userId);
+        console.warn('⚠️ No access token available');
+        return [];
       }
 
       // Get user folder
@@ -377,8 +376,8 @@ class GoogleDriveStorageService {
       const folder = await this.findFolder(folderName, accessToken);
       
       if (!folder) {
-        console.log('📁 No user folder found, returning local metadata');
-        return this.getFileMetadata(userId);
+        console.log('📁 No user folder found in Google Drive');
+        return [];
       }
 
       // Get all files from user folder
@@ -392,36 +391,52 @@ class GoogleDriveStorageService {
 
       if (!response.ok) {
         console.warn('⚠️ Failed to list files from Google Drive');
-        return this.getFileMetadata(userId);
+        return [];
       }
 
       const result = await response.json();
       console.log('📁 Found files in Google Drive:', result.files.length, result.files);
       const audioFiles: GoogleDriveAudioFile[] = [];
 
-      // Process audio files and metadata files
+      // First, collect all metadata files
+      const metadataFiles: { [key: string]: any } = {};
+      console.log('🔍 Processing all files to find metadata...');
+      for (const file of result.files) {
+        console.log('📄 Processing file:', file.name, 'Type:', file.mimeType);
+        if (file.name.endsWith('_metadata.json')) {
+          try {
+            // Download metadata content
+            const metadataResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`
+              }
+            });
+            
+            if (metadataResponse.ok) {
+              const metadata = await metadataResponse.json();
+              // Extract audio file ID from metadata filename (remove _metadata.json suffix)
+              const audioFileId = file.name.replace('_metadata.json', '');
+              metadataFiles[audioFileId] = metadata;
+              console.log('✅ Loaded metadata for audio file ID:', audioFileId, 'Metadata:', metadata);
+            }
+          } catch (error) {
+            console.warn('⚠️ Failed to load metadata file:', file.name, error);
+          }
+        }
+      }
+      console.log('📋 All metadata files collected:', Object.keys(metadataFiles));
+
+      // Then, process audio files and match with metadata
+      console.log('🔍 Processing audio files and matching with metadata...');
       for (const file of result.files) {
         if (file.mimeType === 'audio/wav') {
-          // This is an audio file, try to find its metadata
-          const metadataFile = result.files.find((f: any) => f.name === `${file.id}_metadata.json`);
+          console.log('🎵 Processing audio file:', file.name, 'ID:', file.id);
+          console.log('🔍 Looking for metadata with key:', file.id, 'Available keys:', Object.keys(metadataFiles));
           
-          if (metadataFile) {
-            try {
-              // Download metadata
-              const metadataResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${metadataFile.id}?alt=media`, {
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`
-                }
-              });
-              
-              if (metadataResponse.ok) {
-                const metadata = await metadataResponse.json();
-                audioFiles.push(metadata);
-                console.log('✅ Loaded metadata for audio file:', file.name);
-              }
-            } catch (error) {
-              console.warn('⚠️ Failed to load metadata for file:', file.name);
-            }
+          if (metadataFiles[file.id]) {
+            // Found matching metadata
+            audioFiles.push(metadataFiles[file.id]);
+            console.log('✅ Matched audio file with metadata:', file.name);
           } else {
             // No metadata found, create a basic entry from the audio file
             console.log('⚠️ No metadata found for audio file:', file.name, 'creating basic entry');
@@ -449,7 +464,7 @@ class GoogleDriveStorageService {
       return audioFiles;
     } catch (error) {
       console.error('❌ Google Drive retrieval error:', error);
-      return this.getFileMetadata(userId);
+      return [];
     }
   }
 

@@ -19,20 +19,25 @@ const AudioLibrary: React.FC = () => {
     if (!user?.id) return;
     
     setIsLoading(true);
-    const files = audioStorage.getUserAudioFiles(user.id);
-    setAudioFiles(files);
     
-    // Load Google Drive files
+    // Load Google Drive files only
     try {
       console.log('🔍 Loading Google Drive files for user:', user.id);
       const googleDriveAudioFiles = await googleDriveStorage.getAudioFiles(user.id);
       console.log('📁 Google Drive files loaded:', googleDriveAudioFiles.length, googleDriveAudioFiles);
       setGoogleDriveFiles(googleDriveAudioFiles);
+      
+      // Also load local files as backup display
+      const localFiles = audioStorage.getUserAudioFiles(user.id);
+      setAudioFiles(localFiles);
     } catch (error) {
       console.error('❌ Failed to load Google Drive files:', error);
       setGoogleDriveFiles([]);
+      
+      // Fallback to local files only
+      const localFiles = audioStorage.getUserAudioFiles(user.id);
+      setAudioFiles(localFiles);
     }
-    
     
     setIsLoading(false);
   }, [user?.id, audioStorage, googleDriveStorage]);

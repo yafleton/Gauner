@@ -168,3 +168,4 @@ const SimpleLoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isLogin }) =>
 };
 
 export default SimpleLoginForm;
+
