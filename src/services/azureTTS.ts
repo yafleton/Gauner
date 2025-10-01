@@ -80,7 +80,7 @@ export class AzureTTSService {
       const maxLength = 3000; // More conservative limit
       const finalText = escapedText.length > maxLength ? escapedText.substring(0, maxLength) + '...' : escapedText;
 
-      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}"><voice name="${voice}">${finalText}</voice></speak>`;
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}"><voice name="${voice}"><![CDATA[${finalText}]]></voice></speak>`;
 
       console.log('🔍 Azure TTS Request:', {
         voice,
