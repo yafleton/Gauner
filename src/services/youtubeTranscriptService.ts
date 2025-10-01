@@ -102,86 +102,184 @@ export class YouTubeTranscriptService {
     }
   }
 
-  // Fetch transcript using public API services
+  // Fetch transcript using CORS proxy services
   private async fetchTranscriptFromProxy(videoId: string): Promise<string> {
     console.log('🔍 Attempting to extract transcript for video:', videoId);
     
-    // Try public transcript API services first
-    const apiServices = [
-      // YouTube Transcript API
-      `https://youtubetranscript.com/?server_vid2=${videoId}`,
-      `https://youtubetranscript.com/?server_vid=${videoId}`,
-      
-      // Alternative transcript services
+    // CORS proxy services that allow YouTube API access
+    const corsProxies = [
+      'https://api.allorigins.win/raw?url=',
+      'https://cors-anywhere.herokuapp.com/',
+      'https://corsproxy.io/?',
+      'https://api.codetabs.com/v1/proxy?quest=',
+      'https://thingproxy.freeboard.io/fetch/',
+    ];
+
+    // YouTube transcript API endpoints to try
+    const transcriptEndpoints = [
       `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
       `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
       `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`,
-      
-      // Try with different language codes
       `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US`,
       `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-GB`,
       `https://www.youtube.com/api/timedtext?v=${videoId}&lang=auto`,
     ];
 
-    for (const apiUrl of apiServices) {
-      try {
-        console.log('🔍 Trying API service:', apiUrl);
-        
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Referer': 'https://www.youtube.com/',
-            'Origin': 'https://www.youtube.com'
-          }
-        });
+    // Try each CORS proxy with each endpoint
+    for (const proxy of corsProxies) {
+      for (const endpoint of transcriptEndpoints) {
+        try {
+          const proxiedUrl = proxy + encodeURIComponent(endpoint);
+          console.log('🔍 Trying CORS proxy:', proxy, 'with endpoint:', endpoint);
+          
+          const response = await fetch(proxiedUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json, text/plain, */*',
+              'Accept-Language': 'en-US,en;q=0.9',
+            }
+          });
 
+          if (response.ok) {
+            const text = await response.text();
+            if (text && text.trim().length > 0) {
+              console.log('📄 Got response from proxy, parsing...');
+              
+              // Try to parse as JSON first (for transcript APIs)
+              if (text.trim().startsWith('[') || text.trim().startsWith('{')) {
+                try {
+                  const data = JSON.parse(text);
+                  if (Array.isArray(data)) {
+                    // Format: [{"text": "...", "start": 0, "duration": 2.5}, ...]
+                    const transcript = data.map((item: any) => item.text || item.content || '').join(' ').trim();
+                    if (transcript.length > 10) {
+                      console.log('✅ Successfully extracted transcript via proxy (JSON format)');
+                      return transcript;
+                    }
+                  } else if (data.text || data.transcript) {
+                    // Format: {"text": "...", "transcript": "..."}
+                    const transcript = data.text || data.transcript || '';
+                    if (transcript.length > 10) {
+                      console.log('✅ Successfully extracted transcript via proxy (object format)');
+                      return transcript;
+                    }
+                  }
+                } catch (parseError) {
+                  console.warn('❌ Failed to parse JSON response:', parseError);
+                }
+              }
+              
+              // Try to parse as transcript text
+              const parsedTranscript = this.parseTranscriptText(text);
+              if (parsedTranscript.trim().length > 10) {
+                console.log('✅ Successfully extracted transcript via proxy (text format)');
+                return parsedTranscript;
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('❌ Failed to fetch via proxy:', proxy, error);
+        }
+      }
+    }
+
+    // If CORS proxies fail, try direct public transcript services
+    console.log('🔄 CORS proxies failed, trying direct public services...');
+    return this.fetchTranscriptFromPublicServices(videoId);
+  }
+
+  // Try public transcript services that don't require CORS
+  private async fetchTranscriptFromPublicServices(videoId: string): Promise<string> {
+    // Try a simple approach first - use a known working transcript service
+    try {
+      console.log('🔍 Trying YouTube Transcript API...');
+      
+      // Use a simple transcript service that works
+      const transcriptUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`;
+      
+      // Try with a simple CORS proxy that's known to work
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(transcriptUrl)}`;
+      
+      const response = await fetch(proxyUrl);
+      
+      if (response.ok) {
+        const text = await response.text();
+        console.log('📄 Got response from transcript API:', text.substring(0, 100) + '...');
+        
+        if (text && text.trim().length > 0) {
+          // Try to parse as JSON
+          try {
+            const data = JSON.parse(text);
+            if (Array.isArray(data)) {
+              const transcript = data.map((item: any) => item.text || item.content || '').join(' ').trim();
+              if (transcript.length > 10) {
+                console.log('✅ Successfully extracted transcript from API');
+                return transcript;
+              }
+            }
+          } catch (parseError) {
+            console.warn('❌ Failed to parse JSON, trying as text:', parseError);
+            // Try to parse as plain text
+            const parsedTranscript = this.parseTranscriptText(text);
+            if (parsedTranscript.trim().length > 10) {
+              console.log('✅ Successfully extracted transcript as text');
+              return parsedTranscript;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('❌ YouTube Transcript API failed:', error);
+    }
+
+    // Try alternative services
+    const alternativeServices = [
+      `https://youtubetranscript.com/?server_vid2=${videoId}`,
+      `https://youtubetranscript.com/?server_vid=${videoId}`,
+    ];
+
+    for (const serviceUrl of alternativeServices) {
+      try {
+        console.log('🔍 Trying alternative service:', serviceUrl);
+        
+        const response = await fetch(serviceUrl);
+        
         if (response.ok) {
           const text = await response.text();
           if (text && text.trim().length > 0) {
-            console.log('📄 Got response from API, parsing...');
+            console.log('📄 Got response from alternative service');
             
-            // Try to parse as JSON first (for transcript APIs)
+            // Try to parse as JSON first
             if (text.trim().startsWith('[') || text.trim().startsWith('{')) {
               try {
                 const data = JSON.parse(text);
                 if (Array.isArray(data)) {
-                  // Format: [{"text": "...", "start": 0, "duration": 2.5}, ...]
                   const transcript = data.map((item: any) => item.text || item.content || '').join(' ').trim();
                   if (transcript.length > 10) {
-                    console.log('✅ Successfully extracted transcript from API (JSON format)');
-                    return transcript;
-                  }
-                } else if (data.text || data.transcript) {
-                  // Format: {"text": "...", "transcript": "..."}
-                  const transcript = data.text || data.transcript || '';
-                  if (transcript.length > 10) {
-                    console.log('✅ Successfully extracted transcript from API (object format)');
+                    console.log('✅ Successfully extracted transcript from alternative service');
                     return transcript;
                   }
                 }
               } catch (parseError) {
-                console.warn('❌ Failed to parse JSON response:', parseError);
+                console.warn('❌ Failed to parse JSON from alternative service:', parseError);
               }
             }
             
-            // Try to parse as transcript text
+            // Try to parse as text
             const parsedTranscript = this.parseTranscriptText(text);
             if (parsedTranscript.trim().length > 10) {
-              console.log('✅ Successfully extracted transcript from API (text format)');
+              console.log('✅ Successfully extracted transcript as text from alternative service');
               return parsedTranscript;
             }
           }
         }
       } catch (error) {
-        console.warn('❌ Failed to fetch from API service:', apiUrl, error);
+        console.warn('❌ Alternative service failed:', serviceUrl, error);
       }
     }
 
-    // If API services fail, try HTML parsing approach
-    console.log('🔄 API services failed, trying HTML parsing approach...');
+    // If all else fails, try HTML parsing approach
+    console.log('🔄 All services failed, trying HTML parsing approach...');
     return this.fetchTranscriptFromHtml(videoId);
   }
 
