@@ -301,10 +301,33 @@ const AzureTTS: React.FC = () => {
       setError('');
       setProgress({ current: 0, total: 0 });
 
+      // Convert language name to language code for Azure TTS
+      const languageCodeMap: { [key: string]: string } = {
+        'English': 'en-US',
+        'German': 'de-DE',
+        'French': 'fr-FR',
+        'Spanish': 'es-ES',
+        'Italian': 'it-IT',
+        'Portuguese': 'pt-PT',
+        'Russian': 'ru-RU',
+        'Japanese': 'ja-JP',
+        'Korean': 'ko-KR',
+        'Chinese': 'zh-CN',
+        'Arabic': 'ar-SA',
+        'Dutch': 'nl-NL',
+        'Polish': 'pl-PL',
+        'Romanian': 'ro-RO',
+        'Swedish': 'sv-SE',
+        'Danish': 'da-DK',
+        'Norwegian': 'nb-NO'
+      };
+      
+      const languageCode = languageCodeMap[selectedLanguage] || selectedLanguage;
+
       const audioBuffer = await ttsService.synthesizeLongText(
         text,
         selectedVoice,
-        selectedLanguage,
+        languageCode,
         (current, total) => setProgress({ current, total })
       );
 

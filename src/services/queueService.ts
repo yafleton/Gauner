@@ -132,7 +132,7 @@ class QueueService {
       const audioBuffer = await this.ttsService.synthesizeLongText(
         item.transcript,
         item.voice,
-        this.getLanguageCode(item.language),
+        this.getLanguageCode(item.language), // Convert language name to language code
         (current, total) => {
           // Update progress during generation
           item.progress = 10 + Math.round((current / total) * 50); // 10-60% for generation
@@ -270,10 +270,15 @@ class QueueService {
         throw new Error('TTS service not initialized');
       }
 
-      const audioArrayBuffer = await this.ttsService.synthesizeSpeech(
+      const audioArrayBuffer = await this.ttsService.synthesizeLongText(
         nextItem.transcript,
         nextItem.voice,
-        this.getLanguageCode(nextItem.language)
+        this.getLanguageCode(nextItem.language),
+        (current, total) => {
+          // Update progress during generation
+          nextItem.progress = 10 + Math.round((current / total) * 50); // 10-60% for generation
+          this.notifyQueueUpdate();
+        }
       );
 
       if (!audioArrayBuffer) {
@@ -347,34 +352,34 @@ class QueueService {
     const languageCode = language.toLowerCase();
     
     const voiceMap: { [key: string]: string } = {
-      'en': 'Andrew (US)',
-      'english': 'Andrew (US)',
-      'de': 'Florian',
-      'german': 'Florian',
-      'deutsch': 'Florian',
-      'es': 'Diego',
-      'spanish': 'Diego',
-      'fr': 'Denise',
-      'french': 'Denise',
-      'it': 'Isabella',
-      'italian': 'Isabella',
-      'pt': 'Cristiano',
-      'portuguese': 'Cristiano',
-      'nl': 'Maarten',
-      'dutch': 'Maarten',
-      'pl': 'Jan',
-      'polish': 'Jan',
-      'ru': 'Dmitri',
-      'russian': 'Dmitri',
-      'ja': 'Keita',
-      'japanese': 'Keita',
-      'ko': 'SangHyun',
-      'korean': 'SangHyun',
-      'zh': 'Xiaoxiao',
-      'chinese': 'Xiaoxiao'
+      'en': 'en-US-AndrewNeural',
+      'english': 'en-US-AndrewNeural',
+      'de': 'de-DE-FlorianNeural',
+      'german': 'de-DE-FlorianNeural',
+      'deutsch': 'de-DE-FlorianNeural',
+      'es': 'es-ES-DiegoNeural',
+      'spanish': 'es-ES-DiegoNeural',
+      'fr': 'fr-FR-DeniseNeural',
+      'french': 'fr-FR-DeniseNeural',
+      'it': 'it-IT-ElsaNeural',
+      'italian': 'it-IT-ElsaNeural',
+      'pt': 'pt-PT-AntonioNeural',
+      'portuguese': 'pt-PT-AntonioNeural',
+      'nl': 'nl-NL-MaartenNeural',
+      'dutch': 'nl-NL-MaartenNeural',
+      'pl': 'pl-PL-JanNeural',
+      'polish': 'pl-PL-JanNeural',
+      'ru': 'ru-RU-DmitryNeural',
+      'russian': 'ru-RU-DmitryNeural',
+      'ja': 'ja-JP-KeitaNeural',
+      'japanese': 'ja-JP-KeitaNeural',
+      'ko': 'ko-KR-SangHyunNeural',
+      'korean': 'ko-KR-SangHyunNeural',
+      'zh': 'zh-CN-XiaoxiaoNeural',
+      'chinese': 'zh-CN-XiaoxiaoNeural'
     };
 
-    return voiceMap[languageCode] || 'Andrew (US)';
+    return voiceMap[languageCode] || 'en-US-AndrewNeural';
   }
 
   // Get language code for Azure TTS
