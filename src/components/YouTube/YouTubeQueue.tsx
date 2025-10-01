@@ -235,6 +235,11 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
               onChange={(e) => setYoutubeUrl(e.target.value)}
               placeholder="https://www.youtube.com/watch?v=..."
               className="w-full px-4 py-2 bg-bg-secondary border border-border-primary rounded-lg text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple"
+              style={{
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                borderColor: 'var(--border-primary)'
+              }}
             />
           </div>
 
@@ -246,9 +251,20 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
               value={selectedLanguage}
               onChange={(e) => setSelectedLanguage(e.target.value)}
               className="w-full px-4 py-2 bg-bg-secondary border border-border-primary rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-purple"
+              style={{
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)'
+              }}
             >
               {languages.map((lang) => (
-                <option key={lang.code} value={lang.name}>
+                <option 
+                  key={lang.code} 
+                  value={lang.name}
+                  style={{
+                    backgroundColor: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)'
+                  }}
+                >
                   {lang.name} ({lang.voice})
                 </option>
               ))}
