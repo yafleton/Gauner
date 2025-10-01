@@ -131,11 +131,10 @@ async function uploadToGoogleDrive(accessToken, folderId, audioFile, filename, m
   // Then, update the file with metadata
   const fileMetadata = {
     name: filename,
-    parents: [folderId],
     description: JSON.stringify(metadata)
   }
 
-  const updateResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+  const updateResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?addParents=${folderId}`, {
     method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
