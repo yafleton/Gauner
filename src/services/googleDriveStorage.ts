@@ -54,23 +54,16 @@ class GoogleDriveStorageService {
       console.log('📥 Loading Google Identity Services...');
       await this.loadGoogleIdentityServices();
 
-      // Wait for google to be available
-      let attempts = 0;
-      while (!window.google && attempts < 30) {
-        console.log(`⏳ Waiting for Google Identity Services... attempt ${attempts + 1}/30`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        attempts++;
+      // The loadGoogleIdentityServices method now handles the waiting internally
+      // Just check if we're ready
+      if (window.google?.accounts?.oauth2) {
+        console.log('✅ Google Identity Services loaded:', !!window.google);
+        this.initialized = true;
+        console.log('✅ Google Drive API initialized successfully');
+      } else {
+        console.error('❌ Google Identity Services not available after loading');
+        this.initialized = false;
       }
-
-      if (!window.google) {
-        console.error('❌ Google Identity Services failed to load after 30 attempts');
-        console.log('🔍 Available window properties:', Object.keys(window).filter(key => key.includes('google')));
-        throw new Error('Google Identity Services failed to load after 30 attempts');
-      }
-
-      console.log('✅ Google Identity Services loaded:', !!window.google);
-      this.initialized = true;
-      console.log('✅ Google Drive API initialized successfully');
     } catch (error) {
       console.error('❌ Google Drive initialization error:', error);
       this.initialized = false;
@@ -80,11 +73,32 @@ class GoogleDriveStorageService {
   // Load Google Identity Services
   private loadGoogleIdentityServices(): Promise<void> {
     return new Promise((resolve, reject) => {
+      // Check if already loaded
+      if (window.google?.accounts?.oauth2) {
+        console.log('✅ Google Identity Services already loaded');
+        resolve();
+        return;
+      }
+
       // Check if script already exists
       const existingScript = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
       if (existingScript) {
         console.log('📋 Google Identity Services script already exists');
-        resolve();
+        // Wait for it to load with retry logic
+        let attempts = 0;
+        const checkInterval = setInterval(() => {
+          attempts++;
+          console.log(`🔍 Checking for window.google (attempt ${attempts}):`, !!window.google);
+          if (window.google?.accounts?.oauth2) {
+            console.log('✅ Google Identity Services loaded after wait');
+            clearInterval(checkInterval);
+            resolve();
+          } else if (attempts >= 20) { // 10 seconds max
+            console.warn('⚠️ Google Identity Services script exists but not loaded after 10 seconds');
+            clearInterval(checkInterval);
+            reject(new Error('Google Identity Services failed to load'));
+          }
+        }, 500);
         return;
       }
 
@@ -93,15 +107,25 @@ class GoogleDriveStorageService {
       // Load Google Identity Services
       const gisScript = document.createElement('script');
       gisScript.src = 'https://accounts.google.com/gsi/client';
-      gisScript.async = false; // Load synchronously to ensure proper initialization
-      gisScript.defer = false;
+      gisScript.async = true; // Change to async
+      gisScript.defer = true; // Add defer
       gisScript.onload = () => {
         console.log('✅ Google Identity Services script loaded successfully');
-        // Wait a bit more for the google object to be available
-        setTimeout(() => {
-          console.log('🔍 Checking for window.google after script load:', !!window.google);
-          resolve();
-        }, 1000);
+        // Wait for google object to be available with retry logic
+        let attempts = 0;
+        const checkInterval = setInterval(() => {
+          attempts++;
+          console.log(`🔍 Checking for window.google after script load (attempt ${attempts}):`, !!window.google);
+          if (window.google?.accounts?.oauth2) {
+            console.log('✅ Google Identity Services ready');
+            clearInterval(checkInterval);
+            resolve();
+          } else if (attempts >= 30) { // 15 seconds max
+            console.error('❌ Google Identity Services failed to initialize after 15 seconds');
+            clearInterval(checkInterval);
+            reject(new Error('Google Identity Services failed to initialize'));
+          }
+        }, 500);
       };
       gisScript.onerror = (error) => {
         console.error('❌ Failed to load Google Identity Services script:', error);
@@ -115,12 +139,22 @@ class GoogleDriveStorageService {
 
   // Check if Google Drive is ready
   isReady(): boolean {
-    const ready = this.initialized && window.google;
+    const ready = this.initialized && window.google?.accounts?.oauth2;
     console.log('🔍 Google Drive ready check:', {
       initialized: this.initialized,
       hasGoogle: !!window.google,
+      hasOAuth2: !!window.google?.accounts?.oauth2,
       ready
     });
+    
+    // If not ready but google is available, try to reinitialize
+    if (!ready && window.google && !this.initialized) {
+      console.log('🔄 Google available but not initialized, attempting reinitialization...');
+      this.initializeGoogleDrive().catch(error => {
+        console.error('❌ Reinitialization failed:', error);
+      });
+    }
+    
     return ready;
   }
 
