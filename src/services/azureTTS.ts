@@ -61,36 +61,20 @@ export class AzureTTSService {
   }
 
   async synthesizeSpeech(text: string, voice: string, language: string): Promise<ArrayBuffer> {
-    // If no valid API key, return demo audio
+    // If no valid API key, throw error
     if (!this.apiKey || this.apiKey === 'demo-key') {
-      console.log('AzureTTSService: Demo mode - generating placeholder audio');
-      return this.generateDemoAudio(text);
+      throw new Error('Azure TTS API key not configured. Please set up your Azure TTS API key.');
     }
 
     try {
-      // Escape special characters for SSML
-      const escapedText = text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-
-      // If text is too long, truncate it for testing
-      const maxLength = 3000; // More conservative limit
-      const finalText = escapedText.length > maxLength ? escapedText.substring(0, maxLength) + '...' : escapedText;
-
-      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}"><voice name="${voice}"><![CDATA[${finalText}]]></voice></speak>`;
+      // Simple SSML without CDATA wrapping
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}"><voice name="${voice}">${text}</voice></speak>`;
 
       console.log('🔍 Azure TTS Request:', {
         voice,
         language,
-        originalTextLength: text.length,
-        escapedTextLength: escapedText.length,
-        finalTextLength: finalText.length,
+        textLength: text.length,
         textPreview: text.substring(0, 50) + '...',
-        escapedTextPreview: escapedText.substring(0, 50) + '...',
-        finalTextPreview: finalText.substring(0, 50) + '...',
         ssmlPreview: ssml.substring(0, 200) + '...',
         apiKey: this.apiKey ? `${this.apiKey.substring(0, 8)}...` : 'none',
         region: this.region
@@ -113,11 +97,8 @@ export class AzureTTSService {
         console.error('Azure TTS Response Headers:', Object.fromEntries(response.headers.entries()));
         console.error('Azure TTS Full SSML:', ssml);
         
-        // If it's an auth or bad request error, fall back to demo mode
-        if (response.status === 401 || response.status === 403 || response.status === 400) {
-          console.log(`Azure TTS: ${response.status} error - falling back to demo mode`);
-          return this.generateDemoAudio(text);
-        }
+        // Log the error and throw it
+        console.error(`Azure TTS: ${response.status} error`);
         
         throw new Error(`TTS synthesis failed: ${response.status} ${response.statusText} - ${errorText}`);
       }
@@ -135,10 +116,9 @@ export class AzureTTSService {
     language: string,
     onProgress?: (chunk: number, total: number) => void
   ): Promise<ArrayBuffer> {
-    // If no valid API key, return demo audio
+    // If no valid API key, throw error
     if (!this.apiKey || this.apiKey === 'demo-key') {
-      console.log('AzureTTSService: Demo mode - generating placeholder audio for long text');
-      return this.generateDemoAudio(text);
+      throw new Error('Azure TTS API key not configured. Please set up your Azure TTS API key.');
     }
 
     const maxChunkLength = 5000; // Azure TTS limit is around 5000 characters per request
