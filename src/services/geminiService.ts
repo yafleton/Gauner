@@ -8,14 +8,14 @@ interface GeminiResponse {
   }>;
 }
 
-interface ScriptModification {
+export interface ScriptModification {
   type: string;
   description: string;
   examples: string[];
   impact: 'low' | 'medium' | 'high';
 }
 
-interface ScriptAnalysis {
+export interface ScriptAnalysis {
   mainCharacter: string;
   genre: string;
   setting: string;
