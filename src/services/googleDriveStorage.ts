@@ -409,7 +409,7 @@ class GoogleDriveStorageService {
         throw new Error(uploadResult.error || 'Upload failed');
       }
 
-      const { fileId, fileUrl, folderId } = uploadResult.data;
+      const { fileId, fileUrl } = uploadResult.data;
       const driveUrl = fileUrl || `https://drive.google.com/file/d/${fileId}/view`;
 
       const googleDriveAudioFile: GoogleDriveAudioFile = {
