@@ -578,6 +578,8 @@ class GoogleDriveStorageService {
 
   // Delete audio file from Google Drive
   async deleteAudioFile(userId: string, fileId: string): Promise<GoogleDriveStorageResponse> {
+    console.log('🗑️ Starting deletion for file ID:', fileId, 'user:', userId);
+    
     if (!this.isReady()) {
       return {
         success: false,
@@ -594,31 +596,82 @@ class GoogleDriveStorageService {
         };
       }
 
-      // Delete audio file from Google Drive using the fileId directly
-      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Delete failed: ${response.statusText}`);
+      // First, find the user folder to get all files
+      const folderName = `GaunerAudio_${userId}`;
+      const folder = await this.findFolder(folderName, accessToken);
+      if (!folder) {
+        console.error('❌ User folder not found:', folderName);
+        return {
+          success: false,
+          error: 'User folder not found'
+        };
       }
 
-      // Also try to delete metadata file (ignore errors)
-      await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}_metadata`, {
+      // Get all files in the folder to find the metadata file
+      const listResponse = await fetch(`https://www.googleapis.com/drive/v3/files?q='${folder.id}' in parents&fields=files(id,name)`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      if (!listResponse.ok) {
+        throw new Error(`Failed to list files: ${listResponse.statusText}`);
+      }
+
+      const listResult = await listResponse.json();
+      console.log('📁 Files in folder:', listResult.files);
+
+      // Find the metadata file for this audio file
+      let metadataFileId = null;
+      for (const file of listResult.files) {
+        if (file.name === `${fileId}_metadata.json`) {
+          metadataFileId = file.id;
+          console.log('📄 Found metadata file:', file.name, 'ID:', metadataFileId);
+          break;
+        }
+      }
+
+      // Delete the audio file
+      console.log('🗑️ Deleting audio file:', fileId);
+      const audioResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${accessToken}`
         }
-      }).catch(() => {
-        // Metadata file might not exist, ignore error
       });
 
-      window.dispatchEvent(new CustomEvent('googleDriveUpdate')); // Notify components of update
+      if (!audioResponse.ok) {
+        const errorText = await audioResponse.text();
+        console.error('❌ Failed to delete audio file:', audioResponse.status, errorText);
+        throw new Error(`Failed to delete audio file: ${audioResponse.status} ${audioResponse.statusText} - ${errorText}`);
+      }
 
-      console.log('🗑️ Audio file deleted from Google Drive:', fileId);
+      console.log('✅ Audio file deleted successfully');
+
+      // Delete the metadata file if it exists
+      if (metadataFileId) {
+        console.log('🗑️ Deleting metadata file:', metadataFileId);
+        const metadataResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${metadataFileId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        });
+
+        if (!metadataResponse.ok) {
+          const errorText = await metadataResponse.text();
+          console.warn('⚠️ Failed to delete metadata file:', metadataResponse.status, errorText);
+        } else {
+          console.log('✅ Metadata file deleted successfully');
+        }
+      } else {
+        console.log('ℹ️ No metadata file found to delete');
+      }
+
+      // Notify components of update
+      window.dispatchEvent(new CustomEvent('googleDriveUpdate'));
+      console.log('🗑️ Audio file and metadata deleted from Google Drive');
+
       return { success: true };
     } catch (error) {
       console.error('❌ Google Drive deletion error:', error);
