@@ -249,12 +249,12 @@ const AzureTTS: React.FC = () => {
         setTimeout(() => setShowSaveSuccess(false), 3000);
       } else {
         console.error('❌ Failed to save to Google Drive:', googleDriveResult.error);
-        alert('Failed to save audio to Google Drive. Please ensure you are connected to Google Drive.');
+        setError(`Failed to save audio to Google Drive: ${googleDriveResult.error}`);
         setShowSaveSuccess(false);
       }
     } else {
       console.error('❌ Google Drive not ready or not authenticated');
-      alert('Google Drive not connected. Please connect to Google Drive to save audio files.');
+      setError('Google Drive not connected. Please connect to Google Drive to save audio files.');
       setShowSaveSuccess(false);
     }
 
@@ -373,7 +373,10 @@ const AzureTTS: React.FC = () => {
                 </label>
                 <textarea
                   value={text}
-                  onChange={(e) => setText(e.target.value)}
+                  onChange={(e) => {
+                    setText(e.target.value);
+                    if (error) setError(''); // Clear error when user starts typing
+                  }}
                   className="input min-h-[300px] resize-none"
                   placeholder="Enter the text you want to convert to speech..."
                   maxLength={1000000}
@@ -519,9 +522,9 @@ const AzureTTS: React.FC = () => {
                   </div>
                 )}
                 {googleDriveAuthStatus === 'not-authenticated' && (
-                  <div>
-                    <p className="text-yellow-300 text-xs">⚠️ Google Drive not connected</p>
-                    <p className="text-yellow-200 text-xs">Audio files will be saved locally only</p>
+                  <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3">
+                    <p className="text-yellow-300 text-sm font-medium">⚠️ Google Drive Required</p>
+                    <p className="text-yellow-200 text-xs mt-1">Connect to Google Drive to save and sync audio files across devices</p>
                     <button
                       onClick={async () => {
                         const success = await googleDriveStorage.authenticate();
@@ -529,16 +532,22 @@ const AzureTTS: React.FC = () => {
                           setGoogleDriveAuthStatus('authenticated');
                         }
                       }}
-                      className="mt-2 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition-colors"
+                      className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors font-medium"
                     >
                       Connect Google Drive
                     </button>
                   </div>
                 )}
                 {googleDriveAuthStatus === 'error' && (
-                  <div>
-                    <p className="text-red-300 text-xs">❌ Google Drive connection failed</p>
-                    <p className="text-red-200 text-xs">Audio files will be saved locally only</p>
+                  <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3">
+                    <p className="text-red-300 text-sm font-medium">❌ Google Drive Connection Failed</p>
+                    <p className="text-red-200 text-xs mt-1">Please refresh the page and try connecting again</p>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="mt-3 w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors font-medium"
+                    >
+                      Refresh Page
+                    </button>
                   </div>
                 )}
               </div>
