@@ -76,14 +76,21 @@ export class AzureTTSService {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&apos;');
 
-      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}"><voice name="${voice}">${escapedText}</voice></speak>`;
+      // If text is too long, truncate it for testing
+      const maxLength = 3000; // More conservative limit
+      const finalText = escapedText.length > maxLength ? escapedText.substring(0, maxLength) + '...' : escapedText;
+
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}"><voice name="${voice}">${finalText}</voice></speak>`;
 
       console.log('🔍 Azure TTS Request:', {
         voice,
         language,
-        textLength: text.length,
+        originalTextLength: text.length,
+        escapedTextLength: escapedText.length,
+        finalTextLength: finalText.length,
         textPreview: text.substring(0, 50) + '...',
         escapedTextPreview: escapedText.substring(0, 50) + '...',
+        finalTextPreview: finalText.substring(0, 50) + '...',
         ssmlPreview: ssml.substring(0, 200) + '...',
         apiKey: this.apiKey ? `${this.apiKey.substring(0, 8)}...` : 'none',
         region: this.region
@@ -103,6 +110,8 @@ export class AzureTTSService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Azure TTS Error Response:', errorText);
+        console.error('Azure TTS Response Headers:', Object.fromEntries(response.headers.entries()));
+        console.error('Azure TTS Full SSML:', ssml);
         
         // If it's an auth or bad request error, fall back to demo mode
         if (response.status === 401 || response.status === 403 || response.status === 400) {
