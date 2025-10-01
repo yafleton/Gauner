@@ -632,7 +632,8 @@ class GoogleDriveStorageService {
       }
 
       // Delete the audio file
-      console.log('🗑️ Deleting audio file:', fileId);
+      console.log('🗑️ Deleting audio file with ID:', fileId);
+      console.log('🗑️ File ID type:', typeof fileId, 'Length:', fileId.length);
       const audioResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
         method: 'DELETE',
         headers: {

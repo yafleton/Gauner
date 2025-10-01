@@ -348,7 +348,7 @@ const AudioLibrary: React.FC = () => {
                       <Cloud size={14} />
                     </button>
                     <button
-                      onClick={() => handleGoogleDriveDelete(file.id)}
+                      onClick={() => handleGoogleDriveDelete(file.driveFileId)}
                       className="p-1 text-text-secondary hover:text-red-400 transition-colors"
                       title="Delete"
                     >
