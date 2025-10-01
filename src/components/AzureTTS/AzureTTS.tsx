@@ -331,53 +331,56 @@ const AzureTTS: React.FC = () => {
         (current, total) => setProgress({ current, total })
       );
 
-          // Generate filename
-          const timestamp = Date.now();
-          const generatedFilename = customFilename.trim()
-            ? `${customFilename.trim()}.mp3`
-            : `tts-${timestamp}.mp3`;
+      // Generate filename
+      const timestamp = Date.now();
+      const generatedFilename = customFilename.trim()
+        ? `${customFilename.trim()}.mp3`
+        : `tts-${timestamp}.mp3`;
 
-          // Save to user's audio storage
-          if (user?.id) {
-            const audioBlob = new Blob([audioBuffer], { type: 'audio/mp3' });
-            
-            // Create audio file object
-            const audioFile = {
-              id: uuidv4(),
-              userId: user.id,
-              filename: generatedFilename,
-              blob: audioBlob,
-              createdAt: new Date(),
-              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-              voice: selectedVoice,
-              text: text.substring(0, 100), // First 100 chars
-              size: audioBlob.size,
-            };
-
-    // Try to save to Google Drive (optional - don't fail if it doesn't work)
-    if (isGoogleDriveReady && googleDriveAuthStatus === 'authenticated') {
-      console.log('🔄 Attempting to upload to Google Drive...');
-      try {
-        const googleDriveResult = await googleDriveStorage.saveAudioFile(user.id, audioFile);
+      // Save to user's audio storage
+      if (user?.id) {
+        const audioBlob = new Blob([audioBuffer], { type: 'audio/mp3' });
         
-        if (googleDriveResult.success) {
-          console.log('✅ Audio file saved to Google Drive for cross-device access');
-          setShowSaveSuccess(true);
-          setTimeout(() => setShowSaveSuccess(false), 3000);
+        // Create audio file object
+        const audioFile = {
+          id: uuidv4(),
+          userId: user.id,
+          filename: generatedFilename,
+          blob: audioBlob,
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+          voice: selectedVoice,
+          text: text.substring(0, 100), // First 100 chars
+          size: audioBlob.size,
+        };
+
+        // Try to save to Google Drive (optional - don't fail if it doesn't work)
+        if (isGoogleDriveReady && googleDriveAuthStatus === 'authenticated') {
+          console.log('🔄 Attempting to upload to Google Drive...');
+          try {
+            const googleDriveResult = await googleDriveStorage.saveAudioFile(user.id, audioFile);
+            
+            if (googleDriveResult.success) {
+              console.log('✅ Audio file saved to Google Drive for cross-device access');
+              setShowSaveSuccess(true);
+              setTimeout(() => setShowSaveSuccess(false), 3000);
+            } else {
+              console.warn('⚠️ Google Drive save failed, but continuing:', googleDriveResult.error);
+              // Don't show error to user - Google Drive is optional
+              setShowSaveSuccess(false);
+            }
+          } catch (error) {
+            console.warn('⚠️ Google Drive save failed, but continuing:', error);
+            // Don't show error to user - Google Drive is optional
+            setShowSaveSuccess(false);
+          }
         } else {
-          console.warn('⚠️ Google Drive save failed, but continuing:', googleDriveResult.error);
-          // Don't show error to user - Google Drive is optional
+          console.log('ℹ️ Google Drive not available - audio generated successfully without cloud save');
           setShowSaveSuccess(false);
         }
-      } catch (error) {
-        console.warn('⚠️ Google Drive save failed, but continuing:', error);
-        // Don't show error to user - Google Drive is optional
-        setShowSaveSuccess(false);
+
+        setCustomFilename('');
       }
-    } else {
-      console.log('ℹ️ Google Drive not available - audio generated successfully without cloud save');
-      setShowSaveSuccess(false);
-    }
 
     } catch (error) {
       setError('Failed to synthesize speech. Please check your API key and try again.');
