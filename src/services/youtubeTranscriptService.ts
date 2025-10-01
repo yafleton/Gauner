@@ -90,52 +90,157 @@ export class YouTubeTranscriptService {
     }
   }
 
-  // Fetch transcript using a more reliable method
+  // Fetch transcript using yt-dlp style approach
   private async fetchTranscriptFromProxy(videoId: string): Promise<string> {
     console.log('🔍 Attempting to extract transcript for video:', videoId);
     
-    // Try multiple transcript endpoints and methods
-    const transcriptEndpoints = [
-      // Primary method - try to get available transcripts first
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=ttml`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=vtt`,
-      // Fallback to XML format
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`,
-    ];
+    // First, try to get the video page to extract transcript URLs
+    try {
+      const videoPageUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      console.log('📄 Fetching video page to extract transcript URLs...');
+      
+      const pageResponse = await fetch(videoPageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+        }
+      });
 
-    for (const endpoint of transcriptEndpoints) {
-      try {
-        console.log('🔍 Trying endpoint:', endpoint);
+      if (pageResponse.ok) {
+        const pageHtml = await pageResponse.text();
+        console.log('📄 Got video page HTML, extracting transcript URLs...');
         
-        // Try direct fetch first
-        const response = await fetch(endpoint, {
-          method: 'GET',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Referer': 'https://www.youtube.com/',
-            'Origin': 'https://www.youtube.com'
-          }
-        });
+        // Extract transcript URLs from the page HTML (similar to yt-dlp)
+        const transcriptUrls = this.extractTranscriptUrlsFromHtml(pageHtml, videoId);
+        console.log('🔍 Found transcript URLs:', transcriptUrls);
+        
+        if (transcriptUrls.length > 0) {
+          // Try each transcript URL
+          for (const transcriptUrl of transcriptUrls) {
+            try {
+              console.log('🔍 Trying transcript URL:', transcriptUrl);
+              const transcriptResponse = await fetch(transcriptUrl, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                  'Referer': 'https://www.youtube.com/',
+                }
+              });
 
-        if (response.ok) {
-          const text = await response.text();
-          if (text && text.trim().length > 0) {
-            console.log('✅ Successfully got transcript from:', endpoint);
-            return this.parseTranscriptText(text);
+              if (transcriptResponse.ok) {
+                const transcriptText = await transcriptResponse.text();
+                if (transcriptText && transcriptText.trim().length > 0) {
+                  const parsedTranscript = this.parseTranscriptText(transcriptText);
+                  if (parsedTranscript.trim().length > 10) {
+                    console.log('✅ Successfully extracted transcript from URL:', transcriptUrl);
+                    return parsedTranscript;
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn('❌ Failed to fetch transcript from URL:', transcriptUrl, error);
+            }
           }
         }
-      } catch (error) {
-        console.warn('❌ Failed to fetch from endpoint:', endpoint, error);
       }
+    } catch (error) {
+      console.warn('❌ Failed to fetch video page:', error);
     }
 
-    // If all direct methods fail, try alternative approach
-    console.log('🔄 All direct methods failed, trying alternative approach...');
+    // If page extraction fails, try direct API methods
+    console.log('🔄 Page extraction failed, trying direct API methods...');
     return this.fetchTranscriptAlternative(videoId);
+  }
+
+  // Extract transcript URLs from YouTube page HTML (yt-dlp style)
+  private extractTranscriptUrlsFromHtml(html: string, videoId: string): string[] {
+    const transcriptUrls: string[] = [];
+    
+    try {
+      // Look for transcript URLs in the page HTML
+      // YouTube embeds transcript URLs in various places in the HTML
+      
+      // Method 1: Look for captions in player config
+      const playerConfigMatch = html.match(/"captions":\s*{[^}]*"playerCaptionsTracklistRenderer":\s*{[^}]*"captionTracks":\s*\[([^\]]+)\]/);
+      if (playerConfigMatch) {
+        const captionTracks = playerConfigMatch[1];
+        const urlMatches = captionTracks.match(/"baseUrl":"([^"]+)"/g);
+        if (urlMatches) {
+          urlMatches.forEach(match => {
+            const url = match.match(/"baseUrl":"([^"]+)"/)?.[1];
+            if (url) {
+              transcriptUrls.push(decodeURIComponent(url));
+            }
+          });
+        }
+      }
+      
+      // Method 2: Look for transcript URLs in ytInitialPlayerResponse
+      const ytInitialPlayerResponseMatch = html.match(/var ytInitialPlayerResponse = ({.+?});/);
+      if (ytInitialPlayerResponseMatch) {
+        try {
+          const playerResponse = JSON.parse(ytInitialPlayerResponseMatch[1]);
+          if (playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks) {
+            playerResponse.captions.playerCaptionsTracklistRenderer.captionTracks.forEach((track: any) => {
+              if (track.baseUrl) {
+                transcriptUrls.push(track.baseUrl);
+              }
+            });
+          }
+        } catch (error) {
+          console.warn('Failed to parse ytInitialPlayerResponse:', error);
+        }
+      }
+      
+      // Method 3: Look for transcript URLs in various other places
+      const urlPatterns = [
+        /"baseUrl":"([^"]*timedtext[^"]*)"/g,
+        /"captionTracks":\s*\[([^\]]+)\]/g,
+        /"captions":\s*{[^}]*"baseUrl":"([^"]+)"/g
+      ];
+      
+      urlPatterns.forEach(pattern => {
+        const matches = html.match(pattern);
+        if (matches) {
+          matches.forEach(match => {
+            const urlMatch = match.match(/"baseUrl":"([^"]+)"/);
+            if (urlMatch) {
+              const url = decodeURIComponent(urlMatch[1]);
+              if (url.includes('timedtext') && !transcriptUrls.includes(url)) {
+                transcriptUrls.push(url);
+              }
+            }
+          });
+        }
+      });
+      
+      // Method 4: Construct common transcript URLs
+      const commonUrls = [
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=ttml`,
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=vtt`,
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`,
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US`,
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=auto`,
+      ];
+      
+      commonUrls.forEach(url => {
+        if (!transcriptUrls.includes(url)) {
+          transcriptUrls.push(url);
+        }
+      });
+      
+      console.log('🔍 Extracted transcript URLs:', transcriptUrls);
+      return transcriptUrls;
+    } catch (error) {
+      console.error('❌ Error extracting transcript URLs from HTML:', error);
+      return [];
+    }
   }
 
   // Alternative transcript extraction method
@@ -181,14 +286,14 @@ export class YouTubeTranscriptService {
       }
     }
 
-    // Final fallback - try to get any available transcript
-    console.log('🔄 Trying final fallback method...');
+    // Final fallback - try CORS proxy
+    console.log('🔄 Trying CORS proxy fallback...');
     try {
-      const fallbackUrl = `https://www.youtube.com/api/timedtext?v=${videoId}`;
-      const response = await fetch(fallbackUrl, {
+      const proxyUrl = `https://cors-anywhere.herokuapp.com/https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`;
+      const response = await fetch(proxyUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Referer': 'https://www.youtube.com/'
+          'X-Requested-With': 'XMLHttpRequest',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
       });
 
@@ -197,16 +302,48 @@ export class YouTubeTranscriptService {
         if (text && text.trim().length > 0) {
           const transcript = this.parseTranscriptText(text);
           if (transcript.trim().length > 10) {
-            console.log('✅ Found transcript with fallback method');
+            console.log('✅ Found transcript with CORS proxy fallback');
             return transcript;
           }
         }
       }
     } catch (error) {
-      console.warn('❌ Final fallback method also failed:', error);
+      console.warn('❌ CORS proxy fallback also failed:', error);
     }
 
-    throw new Error('No transcript available for this video. The video may not have captions or auto-generated subtitles.');
+    // Last resort - try different CORS proxies
+    const corsProxies = [
+      'https://api.allorigins.win/raw?url=',
+      'https://cors.bridged.cc/',
+      'https://thingproxy.freeboard.io/fetch/'
+    ];
+
+    for (const proxy of corsProxies) {
+      try {
+        console.log(`🔄 Trying CORS proxy: ${proxy}`);
+        const proxyUrl = `${proxy}https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`;
+        const response = await fetch(proxyUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          }
+        });
+
+        if (response.ok) {
+          const text = await response.text();
+          if (text && text.trim().length > 0) {
+            const transcript = this.parseTranscriptText(text);
+            if (transcript.trim().length > 10) {
+              console.log(`✅ Found transcript with proxy: ${proxy}`);
+              return transcript;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`❌ Proxy ${proxy} failed:`, error);
+      }
+    }
+
+    throw new Error('No transcript available for this video. The video may not have captions or auto-generated subtitles. Try a different video with confirmed captions.');
   }
 
   // Parse transcript text in various formats
