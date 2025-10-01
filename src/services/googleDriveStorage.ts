@@ -414,24 +414,19 @@ class GoogleDriveStorageService {
       return [];
     }
 
-    if (!this.isAuthenticated()) {
-      console.warn('⚠️ User not authenticated with Google Drive');
+    const token = localStorage.getItem('google_drive_access_token');
+    if (!token) {
+      console.warn('⚠️ User not authenticated with Google Drive - no access token found');
       return [];
     }
 
     try {
-      const accessToken = localStorage.getItem('google_drive_access_token');
-      if (!accessToken) {
-        console.warn('⚠️ No access token available');
-        return [];
-      }
-
-      console.log('🔑 Access token available, length:', accessToken.length);
+      console.log('🔑 Access token available, length:', token.length);
 
       // Get user folder
       const folderName = `GaunerAudio_${userId}`;
       console.log('📁 Looking for user folder:', folderName);
-      const folder = await this.findFolder(folderName, accessToken);
+      const folder = await this.findFolder(folderName, token);
       
       if (!folder) {
         console.log('📁 No user folder found in Google Drive for user:', userId);
@@ -444,7 +439,7 @@ class GoogleDriveStorageService {
       // Get all files from user folder
       const response = await fetch(`https://www.googleapis.com/drive/v3/files?q='${folder.id}' in parents&fields=files(id,name,mimeType,size,modifiedTime)`, {
         headers: {
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': `Bearer ${token}`
         }
       });
 
@@ -469,7 +464,7 @@ class GoogleDriveStorageService {
             // Download metadata content
             const metadataResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
               headers: {
-                'Authorization': `Bearer ${accessToken}`
+                'Authorization': `Bearer ${token}`
               }
             });
             
