@@ -86,7 +86,7 @@ export class AzureTTSService {
         headers: {
           'Ocp-Apim-Subscription-Key': this.apiKey,
           'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': 'riff-24khz-16bit-mono-pcm',
+          'X-Microsoft-OutputFormat': 'audio-16khz-160kbitrate-mono-mp3',
         },
         body: ssml,
       });
@@ -192,9 +192,8 @@ export class AzureTTSService {
       return audioBuffers[0];
     }
 
-    // Assuming WAV format, combine headers and data
-    // This is a simplified approach and might need more robust WAV header manipulation
-    // for production-grade applications.
+    // For MP3 format, we can concatenate the raw MP3 data directly
+    // MP3 files can be concatenated byte-wise without headers
     const totalLength = audioBuffers.reduce((sum, buffer) => sum + buffer.byteLength, 0);
     const combinedBuffer = new Uint8Array(totalLength);
     let offset = 0;
@@ -207,8 +206,8 @@ export class AzureTTSService {
     return combinedBuffer.buffer;
   }
 
-  downloadAudio(audioBuffer: ArrayBuffer, filename: string = 'speech.wav'): void {
-    const blob = new Blob([audioBuffer], { type: 'audio/wav' });
+  downloadAudio(audioBuffer: ArrayBuffer, filename: string = 'speech.mp3'): void {
+    const blob = new Blob([audioBuffer], { type: 'audio/mp3' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
