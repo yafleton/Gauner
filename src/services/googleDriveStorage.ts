@@ -497,29 +497,25 @@ class GoogleDriveStorageService {
       console.log('📁 Found files in Google Drive:', result.files.length, result.files);
       const audioFiles: GoogleDriveAudioFile[] = [];
 
-      // First, collect all metadata files
+      // Process audio files and read metadata from description field
       const metadataFiles: { [key: string]: any } = {};
       console.log('🔍 Processing all files to find metadata...');
       for (const file of result.files) {
         console.log('📄 Processing file:', file.name, 'Type:', file.mimeType);
-        if (file.name.endsWith('_metadata.json')) {
+        
+        // Check if it's an audio file
+        if (file.mimeType === 'audio/mp3' || file.mimeType === 'audio/wav' || file.name.endsWith('.mp3') || file.name.endsWith('.wav')) {
           try {
-            // Download metadata content
-            const metadataResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            });
-            
-            if (metadataResponse.ok) {
-              const metadata = await metadataResponse.json();
-              // Extract audio file ID from metadata filename (remove _metadata.json suffix)
-              const audioFileId = file.name.replace('_metadata.json', '');
-              metadataFiles[audioFileId] = metadata;
-              console.log('✅ Loaded metadata for audio file ID:', audioFileId, 'Metadata:', metadata);
+            // Read metadata from file description field
+            if (file.description) {
+              const metadata = JSON.parse(file.description);
+              metadataFiles[file.id] = metadata;
+              console.log('✅ Loaded metadata from description for file:', file.name, 'Metadata:', metadata);
+            } else {
+              console.log('⚠️ No description/metadata found for file:', file.name);
             }
           } catch (error) {
-            console.warn('⚠️ Failed to load metadata file:', file.name, error);
+            console.warn('⚠️ Failed to parse metadata from description for file:', file.name, error);
           }
         }
       }
@@ -528,7 +524,7 @@ class GoogleDriveStorageService {
       // Then, process audio files and match with metadata
       console.log('🔍 Processing audio files and matching with metadata...');
       for (const file of result.files) {
-        if (file.mimeType === 'audio/wav') {
+        if (file.mimeType === 'audio/wav' || file.mimeType === 'audio/mp3') {
           console.log('🎵 Processing audio file:', file.name, 'ID:', file.id);
           console.log('🔍 Looking for metadata with key:', file.id, 'Available keys:', Object.keys(metadataFiles));
           
