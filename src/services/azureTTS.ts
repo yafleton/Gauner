@@ -82,7 +82,7 @@ export class AzureTTSService {
       });
 
       const endpoints = getAzureEndpoints(this.region);
-      const response = await fetch(endpoints.tts, {
+      const response = await fetch(`${endpoints.tts}?format=audio-24khz-160kbitrate-mono-mp3`, {
         method: 'POST',
         headers: {
           'Ocp-Apim-Subscription-Key': this.apiKey,
