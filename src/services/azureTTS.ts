@@ -67,8 +67,9 @@ export class AzureTTSService {
     }
 
     try {
-      // SSML with CDATA wrapping to prevent parsing issues
-      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}"><voice name="${voice}"><![CDATA[${text}]]></voice></speak>`;
+      // Simple SSML without CDATA to avoid any parsing issues
+      const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}"><voice name="${voice}">${escapedText}</voice></speak>`;
 
       console.log('🔍 Azure TTS Request:', {
         voice,
@@ -86,7 +87,7 @@ export class AzureTTSService {
         headers: {
           'Ocp-Apim-Subscription-Key': this.apiKey,
           'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': 'audio-24khz-160kbitrate-mono-mp3',
+          'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
         },
         body: ssml,
       });
@@ -103,7 +104,16 @@ export class AzureTTSService {
         throw new Error(`TTS synthesis failed: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      return await response.arrayBuffer();
+      const audioBuffer = await response.arrayBuffer();
+      console.log('🔍 Azure TTS Response:', {
+        status: response.status,
+        contentType: response.headers.get('content-type'),
+        contentLength: response.headers.get('content-length'),
+        audioBufferSize: audioBuffer.byteLength,
+        firstBytes: new Uint8Array(audioBuffer.slice(0, 16))
+      });
+
+      return audioBuffer;
     } catch (error) {
       console.error('Error synthesizing speech:', error);
       throw error;
