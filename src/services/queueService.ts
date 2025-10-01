@@ -168,14 +168,14 @@ class QueueService {
         throw new Error('Failed to generate audio');
       }
 
-      const audioBlob = new Blob([audioBuffer], { type: 'audio/mp3' });
+      const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
 
       item.progress = 60;
       this.notifyQueueUpdate();
 
       // Generate filename with timestamp like in AzureTTS
       const timestamp = Date.now();
-      const generatedFilename = `${item.title.replace(/[^a-zA-Z0-9]/g, '_')}-${timestamp}.mp3`;
+      const generatedFilename = `${item.title.replace(/[^a-zA-Z0-9]/g, '_')}-${timestamp}.wav`;
 
       // Create audio file object with same structure as AzureTTS
       const audioFile: AudioFile = {

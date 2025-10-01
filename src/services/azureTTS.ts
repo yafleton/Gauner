@@ -86,7 +86,7 @@ export class AzureTTSService {
         headers: {
           'Ocp-Apim-Subscription-Key': this.apiKey,
           'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': 'audio-24khz-160kbitrate-mono-mp3',
+          'X-Microsoft-OutputFormat': 'riff-24khz-16bit-mono-pcm',
         },
         body: ssml,
       });
@@ -192,22 +192,50 @@ export class AzureTTSService {
       return audioBuffers[0];
     }
 
-    // For MP3 format, we can concatenate the raw MP3 data directly
-    // MP3 files can be concatenated byte-wise without headers
-    const totalLength = audioBuffers.reduce((sum, buffer) => sum + buffer.byteLength, 0);
-    const combinedBuffer = new Uint8Array(totalLength);
-    let offset = 0;
-
-    for (const buffer of audioBuffers) {
-      combinedBuffer.set(new Uint8Array(buffer), offset);
-      offset += buffer.byteLength;
+    // For WAV format, we need to properly combine the audio data
+    // Skip the WAV header from all chunks except the first one
+    const firstChunk = new Uint8Array(audioBuffers[0]);
+    let totalAudioDataLength = firstChunk.length - 44; // Subtract WAV header size (44 bytes)
+    
+    // Calculate total audio data length (excluding headers)
+    for (let i = 1; i < audioBuffers.length; i++) {
+      totalAudioDataLength += audioBuffers[i].byteLength - 44;
     }
 
-    return combinedBuffer.buffer;
+    // Create new WAV file with proper header
+    const combinedBuffer = new ArrayBuffer(44 + totalAudioDataLength);
+    const view = new DataView(combinedBuffer);
+    
+    // Copy the header from the first chunk
+    for (let i = 0; i < 44; i++) {
+      view.setUint8(i, firstChunk[i]);
+    }
+    
+    // Update the file size in the header (total length - 8)
+    view.setUint32(4, totalAudioDataLength + 36, true);
+    
+    // Update the data size in the header
+    view.setUint32(40, totalAudioDataLength, true);
+    
+    let offset = 44;
+    
+    // Copy audio data from all chunks (skip headers)
+    for (let i = 0; i < audioBuffers.length; i++) {
+      const chunk = new Uint8Array(audioBuffers[i]);
+      const audioDataStart = i === 0 ? 44 : 44; // Skip header for all chunks
+      const audioDataLength = chunk.length - 44;
+      
+      for (let j = 0; j < audioDataLength; j++) {
+        view.setUint8(offset + j, chunk[audioDataStart + j]);
+      }
+      offset += audioDataLength;
+    }
+
+    return combinedBuffer;
   }
 
-  downloadAudio(audioBuffer: ArrayBuffer, filename: string = 'speech.mp3'): void {
-    const blob = new Blob([audioBuffer], { type: 'audio/mp3' });
+  downloadAudio(audioBuffer: ArrayBuffer, filename: string = 'speech.wav'): void {
+    const blob = new Blob([audioBuffer], { type: 'audio/wav' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
