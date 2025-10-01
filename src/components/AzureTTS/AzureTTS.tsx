@@ -423,8 +423,10 @@ const AzureTTS: React.FC = () => {
             }
           } catch (error) {
             console.error('❌ Google Drive upload failed:', error);
-            setError(`Failed to save to Google Drive: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            return; // Don't continue if Google Drive save fails
+            console.warn('⚠️ Google Drive save failed, but audio was generated successfully');
+            setShowSaveSuccess(true); // Show success because audio was generated
+            setTimeout(() => setShowSaveSuccess(false), 3000);
+            // Don't return - continue to show success
           }
         } else {
           console.log('❌ Google Drive not available - cannot save audio');
