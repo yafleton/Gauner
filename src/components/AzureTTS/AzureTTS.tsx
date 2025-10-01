@@ -378,29 +378,58 @@ const AzureTTS: React.FC = () => {
           size: audioBlob.size,
         };
 
-        // Try to save to Google Drive (optional - don't fail if it doesn't work)
+        // Save to Google Drive via backend (to avoid CORS issues)
         if (isGoogleDriveReady && googleDriveAuthStatus === 'authenticated') {
-          console.log('🔄 Attempting to upload to Google Drive...');
+          console.log('🔄 Uploading to Google Drive via backend...');
           try {
-            const googleDriveResult = await googleDriveStorage.saveAudioFile(user.id, audioFile);
+            const accessToken = localStorage.getItem('google_drive_access_token');
+            if (!accessToken) {
+              throw new Error('No Google Drive access token available');
+            }
+
+            // Create FormData for backend upload
+            const formData = new FormData();
+            formData.append('audioFile', audioBlob, audioFile.filename);
+            formData.append('accessToken', accessToken);
+            formData.append('userId', user.id);
+            formData.append('filename', audioFile.filename);
+            formData.append('metadata', JSON.stringify({
+              ...audioFile,
+              userId: user.id,
+              uploadedAt: new Date().toISOString(),
+              deviceId: 'browser-' + Date.now()
+            }));
+
+            // Upload via Cloudflare Worker backend to avoid CORS
+            const backendUrl = process.env.REACT_APP_BACKEND_URL || 'https://gauner-backend.yafleton.workers.dev';
+            const uploadResponse = await fetch(`${backendUrl}/api/upload-to-drive`, {
+              method: 'POST',
+              body: formData
+            });
+
+            if (!uploadResponse.ok) {
+              const errorText = await uploadResponse.text();
+              throw new Error(`Backend upload failed: ${uploadResponse.status} - ${errorText}`);
+            }
+
+            const uploadResult = await uploadResponse.json();
             
-            if (googleDriveResult.success) {
-              console.log('✅ Audio file saved to Google Drive for cross-device access');
+            if (uploadResult.success) {
+              console.log('✅ Audio file saved to Google Drive via backend');
               setShowSaveSuccess(true);
               setTimeout(() => setShowSaveSuccess(false), 3000);
             } else {
-              console.warn('⚠️ Google Drive save failed, but continuing:', googleDriveResult.error);
-              // Don't show error to user - Google Drive is optional
-              setShowSaveSuccess(false);
+              throw new Error(uploadResult.error || 'Backend upload failed');
             }
           } catch (error) {
-            console.warn('⚠️ Google Drive save failed, but continuing:', error);
-            // Don't show error to user - Google Drive is optional
-            setShowSaveSuccess(false);
+            console.error('❌ Google Drive upload failed:', error);
+            setError(`Failed to save to Google Drive: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            return; // Don't continue if Google Drive save fails
           }
         } else {
-          console.log('ℹ️ Google Drive not available - audio generated successfully without cloud save');
-          setShowSaveSuccess(false);
+          console.log('❌ Google Drive not available - cannot save audio');
+          setError('Google Drive is required to save audio files. Please authenticate with Google Drive first.');
+          return;
         }
 
         setCustomFilename('');
