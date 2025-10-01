@@ -128,6 +128,30 @@ class QueueService {
       item.progress = 10;
       this.notifyQueueUpdate();
 
+      // Check if transcript is an error message
+      const errorPatterns = [
+        'We\'re sorry, YouTube is currently blocking us',
+        'Es tut uns leid, YouTube blockiert uns derzeit',
+        'YouTube is currently blocking',
+        'blockiert uns derzeit daran',
+        'fetching subtitles preventing us',
+        'Untertitel abzurufen, was uns daran hindert',
+        'We\'re working on a fix',
+        'Wir arbeiten an einer Lösung'
+      ];
+
+      const isErrorMessage = errorPatterns.some(pattern => 
+        item.transcript.toLowerCase().includes(pattern.toLowerCase())
+      );
+
+      if (isErrorMessage) {
+        console.warn('⚠️ Skipping audio generation for error message:', item.transcript.substring(0, 100) + '...');
+        item.status = 'failed';
+        item.error = 'Cannot generate audio for error messages';
+        this.notifyQueueUpdate();
+        return;
+      }
+
       // Generate audio using the same method as AzureTTS component
       const audioBuffer = await this.ttsService.synthesizeLongText(
         item.transcript,
