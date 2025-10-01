@@ -264,17 +264,26 @@ class GoogleDriveStorageService {
   // Find folder by name
   private async findFolder(folderName: string, accessToken: string): Promise<any> {
     try {
-      const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${folderName}' and mimeType='application/vnd.google-apps.folder'&fields=files(id,name)`, {
+      console.log('🔍 Searching for folder:', folderName);
+      const url = `https://www.googleapis.com/drive/v3/files?q=name='${folderName}' and mimeType='application/vnd.google-apps.folder'&fields=files(id,name)`;
+      console.log('📡 Folder search URL:', url);
+      
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${accessToken}`
         }
       });
 
+      console.log('📡 Folder search response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error(`Failed to search folder: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('❌ Folder search error response:', errorText);
+        throw new Error(`Failed to search folder: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
+      console.log('📁 Folder search result:', result);
       return result.files.length > 0 ? result.files[0] : null;
     } catch (error) {
       console.error('❌ Error finding folder:', error);
@@ -405,6 +414,11 @@ class GoogleDriveStorageService {
       return [];
     }
 
+    if (!this.isAuthenticated()) {
+      console.warn('⚠️ User not authenticated with Google Drive');
+      return [];
+    }
+
     try {
       const accessToken = localStorage.getItem('google_drive_access_token');
       if (!accessToken) {
@@ -412,14 +426,20 @@ class GoogleDriveStorageService {
         return [];
       }
 
+      console.log('🔑 Access token available, length:', accessToken.length);
+
       // Get user folder
       const folderName = `GaunerAudio_${userId}`;
+      console.log('📁 Looking for user folder:', folderName);
       const folder = await this.findFolder(folderName, accessToken);
       
       if (!folder) {
-        console.log('📁 No user folder found in Google Drive');
+        console.log('📁 No user folder found in Google Drive for user:', userId);
+        console.log('💡 This is normal for first-time users - folder will be created when first audio is saved');
         return [];
       }
+
+      console.log('✅ Found user folder:', folder.name, 'ID:', folder.id);
 
       // Get all files from user folder
       const response = await fetch(`https://www.googleapis.com/drive/v3/files?q='${folder.id}' in parents&fields=files(id,name,mimeType,size,modifiedTime)`, {
