@@ -401,7 +401,7 @@ const AzureTTS: React.FC = () => {
             }));
 
             // Upload via Cloudflare Worker backend to avoid CORS
-            const backendUrl = process.env.REACT_APP_BACKEND_URL || 'https://gauner-backend.yafleton.workers.dev';
+            const backendUrl = process.env.REACT_APP_BACKEND_URL || 'https://gauner-backend.danielfahmy02.workers.dev';
             const uploadResponse = await fetch(`${backendUrl}/api/upload-to-drive`, {
               method: 'POST',
               body: formData
