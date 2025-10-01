@@ -388,12 +388,15 @@ class GoogleDriveStorageService {
         }
       });
 
+      console.log('🔍 Searching for files in folder:', folder.id, 'for user:', userId);
+
       if (!response.ok) {
         console.warn('⚠️ Failed to list files from Google Drive');
         return this.getFileMetadata(userId);
       }
 
       const result = await response.json();
+      console.log('📁 Found files in Google Drive:', result.files.length, result.files);
       const audioFiles: GoogleDriveAudioFile[] = [];
 
       // Process audio files and metadata files
@@ -414,10 +417,30 @@ class GoogleDriveStorageService {
               if (metadataResponse.ok) {
                 const metadata = await metadataResponse.json();
                 audioFiles.push(metadata);
+                console.log('✅ Loaded metadata for audio file:', file.name);
               }
             } catch (error) {
               console.warn('⚠️ Failed to load metadata for file:', file.name);
             }
+          } else {
+            // No metadata found, create a basic entry from the audio file
+            console.log('⚠️ No metadata found for audio file:', file.name, 'creating basic entry');
+            const basicEntry: GoogleDriveAudioFile = {
+              id: file.id,
+              userId: userId,
+              filename: file.name,
+              blob: new Blob(), // Empty blob, will be loaded when needed
+              createdAt: new Date(file.modifiedTime),
+              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+              voice: 'Unknown',
+              text: 'Audio file from Google Drive',
+              size: parseInt(file.size) || 0,
+              uploadedAt: file.modifiedTime,
+              deviceId: 'unknown',
+              driveFileId: file.id,
+              driveUrl: `https://drive.google.com/file/d/${file.id}/view`
+            };
+            audioFiles.push(basicEntry);
           }
         }
       }
