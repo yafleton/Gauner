@@ -297,11 +297,18 @@ class GoogleDriveStorageService {
       const url = `https://www.googleapis.com/drive/v3/files?q=name='${folderName}' and mimeType='application/vnd.google-apps.folder'&fields=files(id,name)`;
       console.log('📡 Folder search URL:', url);
       
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${accessToken}`
-        }
+        },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       console.log('📡 Folder search response status:', response.status, response.statusText);
 
@@ -313,9 +320,14 @@ class GoogleDriveStorageService {
 
       const result = await response.json();
       console.log('📁 Folder search result:', result);
+      console.log('📁 Folder search completed successfully, found', result.files?.length || 0, 'folders');
       return result.files.length > 0 ? result.files[0] : null;
     } catch (error) {
-      console.error('❌ Error finding folder:', error);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('❌ Folder search timed out after 10 seconds');
+      } else {
+        console.error('❌ Error finding folder:', error);
+      }
       return null;
     }
   }
@@ -460,6 +472,7 @@ class GoogleDriveStorageService {
       if (!folder) {
         console.log('📁 No user folder found in Google Drive for user:', userId);
         console.log('💡 This is normal for first-time users - folder will be created when first audio is saved');
+        console.log('🔍 Folder search completed, returning empty array');
         return [];
       }
 

@@ -245,6 +245,12 @@ const AudioLibrary: React.FC = () => {
             Audio Library
           </h2>
           <div className="flex items-center space-x-2">
+            <button
+              onClick={loadAudioFiles}
+              className="text-blue-400 hover:text-blue-300 text-sm px-3 py-1 border border-blue-400/30 rounded"
+            >
+              🔄 Refresh
+            </button>
             {audioFiles.length > 0 && (
               <button
                 onClick={handleDeleteAll}
