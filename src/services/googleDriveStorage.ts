@@ -377,6 +377,7 @@ class GoogleDriveStorageService {
 
       // Upload directly to Google Drive API to avoid backend dependency
       console.log('📤 Uploading directly to Google Drive API...');
+      console.log('⚠️ Note: Direct browser uploads to Google Drive API may fail due to CORS restrictions');
       
       // Prepare metadata for cross-device sync
       const metadata = {
