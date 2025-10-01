@@ -465,6 +465,16 @@ const AzureTTS: React.FC = () => {
     return !!user?.azureApiKey;
   }, [user]);
 
+  // Debug button state
+  const buttonDisabled = isLoading || !text.trim() || !selectedVoice || !hasApiKey;
+  console.log('🔘 Generate button state:', {
+    isLoading,
+    textLength: text.trim().length,
+    selectedVoice,
+    hasApiKey,
+    buttonDisabled
+  });
+
   return (
     <div className="p-8">
       <div className="max-w-4xl mx-auto">
@@ -649,8 +659,21 @@ const AzureTTS: React.FC = () => {
 
               {/* Generate Button */}
               <button
-                onClick={handleSynthesize}
-                disabled={isLoading || !text.trim() || !selectedVoice || !hasApiKey}
+                onClick={(e) => {
+                  console.log('🔘 Generate button clicked!', {
+                    disabled: buttonDisabled,
+                    isLoading,
+                    textLength: text.trim().length,
+                    selectedVoice,
+                    hasApiKey
+                  });
+                  if (!buttonDisabled) {
+                    handleSynthesize();
+                  } else {
+                    console.log('❌ Button click ignored - button is disabled');
+                  }
+                }}
+                disabled={buttonDisabled}
                 className="w-full btn-primary py-3 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
