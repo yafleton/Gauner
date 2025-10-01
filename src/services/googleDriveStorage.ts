@@ -250,7 +250,7 @@ class GoogleDriveStorageService {
     if (!this.isReady()) return null;
 
     try {
-      const folderName = `Gauner-Audio-${userId}`;
+      const folderName = `GaunerAudio_${userId}`;
       const accessToken = localStorage.getItem('google_drive_access_token');
       
       if (!accessToken) {
@@ -259,10 +259,13 @@ class GoogleDriveStorageService {
       }
 
       // Check if folder already exists
+      console.log('🔍 Checking if folder exists:', folderName);
       const existingFolder = await this.findFolder(folderName, accessToken);
       if (existingFolder) {
+        console.log('✅ Folder already exists:', existingFolder.id);
         return existingFolder.id;
       }
+      console.log('📁 Folder does not exist, creating new folder:', folderName);
 
       // Create new folder using fetch API
       const response = await fetch('https://www.googleapis.com/drive/v3/files', {
@@ -277,12 +280,16 @@ class GoogleDriveStorageService {
         })
       });
 
+      console.log('📡 Folder creation response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error(`Failed to create folder: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('❌ Folder creation failed:', response.status, errorText);
+        throw new Error(`Failed to create folder: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('✅ Created user folder:', folderName);
+      console.log('✅ Created user folder:', folderName, 'with ID:', result.id);
       return result.id;
     } catch (error) {
       console.error('❌ Error creating user folder:', error);
@@ -360,13 +367,16 @@ class GoogleDriveStorageService {
 
     try {
       // Create user folder
+      console.log('📁 Creating/checking user folder for:', userId);
       const folderId = await this.createUserFolder(userId);
       if (!folderId) {
+        console.error('❌ Failed to create user folder');
         return {
           success: false,
           error: 'Failed to create user folder'
         };
       }
+      console.log('✅ User folder ready, ID:', folderId);
 
       const accessToken = localStorage.getItem('google_drive_access_token');
       if (!accessToken) {
