@@ -60,6 +60,9 @@ class GoogleDriveStorageService {
         console.log('✅ Google Identity Services loaded:', !!window.google);
         this.initialized = true;
         console.log('✅ Google Drive API initialized successfully');
+        
+        // Dispatch ready event
+        window.dispatchEvent(new CustomEvent('googleDriveReady'));
       } else {
         console.error('❌ Google Identity Services not available after loading');
         this.initialized = false;
@@ -150,7 +153,11 @@ class GoogleDriveStorageService {
     // If not ready but google is available, try to reinitialize
     if (!ready && window.google && !this.initialized) {
       console.log('🔄 Google available but not initialized, attempting reinitialization...');
-      this.initializeGoogleDrive().catch(error => {
+      this.initializeGoogleDrive().then(() => {
+        if (this.initialized) {
+          window.dispatchEvent(new CustomEvent('googleDriveReady'));
+        }
+      }).catch(error => {
         console.error('❌ Reinitialization failed:', error);
       });
     }

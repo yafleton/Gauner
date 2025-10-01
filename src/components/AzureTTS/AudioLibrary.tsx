@@ -20,7 +20,17 @@ const AudioLibrary: React.FC = () => {
     
     setIsLoading(true);
     
-    // Load Google Drive files only
+    // Wait for Google Drive to be ready with retry logic
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (!googleDriveStorage.isReady() && attempts < maxAttempts) {
+      console.log(`⏳ Waiting for Google Drive to be ready... attempt ${attempts + 1}/${maxAttempts}`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      attempts++;
+    }
+    
+    // Load Google Drive files
     try {
       console.log('🔍 Loading Google Drive files for user:', user.id);
       const googleDriveAudioFiles = await googleDriveStorage.getAudioFiles(user.id);
@@ -55,10 +65,17 @@ const AudioLibrary: React.FC = () => {
       loadAudioFiles();
     };
 
+    const handleGoogleDriveReady = () => {
+      console.log('✅ Google Drive ready event received, reloading files...');
+      loadAudioFiles();
+    };
+
     window.addEventListener('googleDriveUpdate', handleGoogleDriveUpdate);
+    window.addEventListener('googleDriveReady', handleGoogleDriveReady);
     
     return () => {
       window.removeEventListener('googleDriveUpdate', handleGoogleDriveUpdate);
+      window.removeEventListener('googleDriveReady', handleGoogleDriveReady);
     };
   }, [loadAudioFiles]);
 
