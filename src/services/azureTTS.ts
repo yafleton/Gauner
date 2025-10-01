@@ -76,6 +76,15 @@ export class AzureTTSService {
         </speak>
       `;
 
+      console.log('🔍 Azure TTS Request:', {
+        voice,
+        language,
+        textLength: text.length,
+        textPreview: text.substring(0, 50) + '...',
+        apiKey: this.apiKey ? `${this.apiKey.substring(0, 8)}...` : 'none',
+        region: this.region
+      });
+
       const endpoints = getAzureEndpoints(this.region);
       const response = await fetch(endpoints.tts, {
         method: 'POST',
