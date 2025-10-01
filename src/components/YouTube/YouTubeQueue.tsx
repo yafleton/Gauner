@@ -4,6 +4,7 @@ import { youtubeTranscriptService } from '../../services/youtubeTranscriptServic
 import { geminiService } from '../../services/geminiService';
 import { queueService, QueueItem, QueueStats } from '../../services/queueService';
 import { ScriptAnalysis } from '../../services/geminiService';
+import { transcriptCleanupService } from '../../services/transcriptCleanupService';
 
 interface YouTubeQueueProps {
   user: any;
@@ -66,9 +67,15 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
       const result = await youtubeTranscriptService.extractTranscript(youtubeUrl);
       
       console.log('✅ Transcript extracted:', result);
+      
+      // Automatically clean the transcript
+      console.log('🧹 Auto-cleaning transcript...');
+      const cleanedTranscript = transcriptCleanupService.cleanTranscript(result.transcript);
+      console.log('✅ Auto-cleanup completed');
+      
       setExtractedData({
         title: result.title,
-        transcript: result.transcript,
+        transcript: cleanedTranscript,
         originalTitle: result.title,
         originalTranscript: result.transcript
       });
@@ -77,7 +84,7 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
       if (selectedLanguage.toLowerCase() !== 'english') {
         console.log('🌍 Translating content to', selectedLanguage);
         const translatedTitle = await geminiService.translateTitle(result.title, selectedLanguage);
-        const translatedTranscript = await geminiService.translateTranscript(result.transcript, selectedLanguage);
+        const translatedTranscript = await geminiService.translateTranscript(cleanedTranscript, selectedLanguage);
         
         setExtractedData({
           title: translatedTitle,
@@ -95,6 +102,7 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
       setIsLoading(false);
     }
   };
+
 
   // Analyze script for modifications
   const handleAnalyzeScript = async () => {
@@ -322,7 +330,14 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">Transcript</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-text-secondary">Transcript</label>
+                {extractedData.transcript && (
+                  <span className="text-xs bg-green-900/20 text-green-400 px-2 py-1 rounded border border-green-500/30">
+                    ✨ Auto-Cleaned Transcript
+                  </span>
+                )}
+              </div>
               <div className="bg-bg-secondary/50 p-3 rounded-lg max-h-40 overflow-y-auto">
                 <p className="text-text-primary text-sm leading-relaxed">{extractedData.transcript}</p>
               </div>
@@ -331,7 +346,9 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
             <div className="flex space-x-3">
               <button
                 onClick={handleAddToQueue}
-                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors font-medium"
+                disabled={isLoading || !extractedData?.transcript || (selectedLanguage.toLowerCase() !== 'english' && extractedData?.transcript === extractedData?.originalTranscript)}
+                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg transition-colors font-medium"
+                title={selectedLanguage.toLowerCase() !== 'english' && extractedData?.transcript === extractedData?.originalTranscript ? "Please wait for translation to complete" : "Add to queue"}
               >
                 <Play className="w-4 h-4 mr-2" />
                 Add to Queue

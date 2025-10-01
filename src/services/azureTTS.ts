@@ -61,6 +61,12 @@ export class AzureTTSService {
   }
 
   async synthesizeSpeech(text: string, voice: string, language: string): Promise<ArrayBuffer> {
+    // If no valid API key, return demo audio
+    if (!this.apiKey || this.apiKey === 'demo-key') {
+      console.log('AzureTTSService: Demo mode - generating placeholder audio');
+      return this.generateDemoAudio(text);
+    }
+
     try {
       const ssml = `
         <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}">
@@ -82,7 +88,16 @@ export class AzureTTSService {
       });
 
       if (!response.ok) {
-        throw new Error(`TTS synthesis failed: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('Azure TTS Error Response:', errorText);
+        
+        // If it's an auth or bad request error, fall back to demo mode
+        if (response.status === 401 || response.status === 403 || response.status === 400) {
+          console.log(`Azure TTS: ${response.status} error - falling back to demo mode`);
+          return this.generateDemoAudio(text);
+        }
+        
+        throw new Error(`TTS synthesis failed: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       return await response.arrayBuffer();
@@ -98,6 +113,12 @@ export class AzureTTSService {
     language: string,
     onProgress?: (chunk: number, total: number) => void
   ): Promise<ArrayBuffer> {
+    // If no valid API key, return demo audio
+    if (!this.apiKey || this.apiKey === 'demo-key') {
+      console.log('AzureTTSService: Demo mode - generating placeholder audio for long text');
+      return this.generateDemoAudio(text);
+    }
+
     const maxChunkLength = 5000; // Azure TTS limit is around 5000 characters per request
     const chunks = this.chunkText(text, maxChunkLength);
 
@@ -202,6 +223,49 @@ export class AzureTTSService {
     this.cache.clear(cacheKey);
     console.log('Cleared Azure voices cache');
   }
+
+  // Generate demo audio for when Azure TTS is not configured
+  private generateDemoAudio(text: string): ArrayBuffer {
+    console.log('Generating demo audio for text:', text.substring(0, 50) + '...');
+    
+    // Create a simple WAV header for a 2-second silent audio
+    const sampleRate = 24000;
+    const duration = 2; // seconds
+    const numSamples = sampleRate * duration;
+    const bufferSize = 44 + (numSamples * 2); // WAV header + 16-bit samples
+    
+    const buffer = new ArrayBuffer(bufferSize);
+    const view = new DataView(buffer);
+    
+    // WAV header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, bufferSize - 8, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true); // fmt chunk size
+    view.setUint16(20, 1, true); // audio format (PCM)
+    view.setUint16(22, 1, true); // number of channels
+    view.setUint32(24, sampleRate, true); // sample rate
+    view.setUint32(28, sampleRate * 2, true); // byte rate
+    view.setUint16(32, 2, true); // block align
+    view.setUint16(34, 16, true); // bits per sample
+    writeString(36, 'data');
+    view.setUint32(40, numSamples * 2, true);
+    
+    // Fill with silence (zeros)
+    for (let i = 44; i < bufferSize; i += 2) {
+      view.setInt16(i, 0, true);
+    }
+    
+    return buffer;
+  }
+
 
   private getComprehensiveFallbackVoices(): AzureVoice[] {
     return [

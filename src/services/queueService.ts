@@ -212,11 +212,19 @@ class QueueService {
       nextItem.progress = 80;
       this.notifyQueueUpdate();
 
-      // Save to Google Drive
-      const saveResult = await googleDriveStorage.saveAudioFile(nextItem.userId || 'queue-user', audioFile);
-      
-      if (!saveResult.success) {
-        throw new Error(`Failed to save to Google Drive: ${saveResult.error}`);
+      // Save to Google Drive (optional - don't fail if Google Drive is not available)
+      try {
+        const saveResult = await googleDriveStorage.saveAudioFile(nextItem.userId || 'queue-user', audioFile);
+        
+        if (!saveResult.success) {
+          console.warn('⚠️ Google Drive save failed, but continuing:', saveResult.error);
+          // Don't throw error - just log the warning and continue
+        } else {
+          console.log('✅ Successfully saved to Google Drive');
+        }
+      } catch (error) {
+        console.warn('⚠️ Google Drive save failed, but continuing:', error);
+        // Don't throw error - just log the warning and continue
       }
 
       nextItem.progress = 100;

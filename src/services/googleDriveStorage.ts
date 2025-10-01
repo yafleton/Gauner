@@ -180,6 +180,7 @@ class GoogleDriveStorageService {
         const tokenClient = window.google.accounts.oauth2.initTokenClient({
           client_id: this.CLIENT_ID,
           scope: this.SCOPES,
+          redirect_uri: window.location.origin,
           callback: (response: any) => {
             if (response.access_token) {
               console.log('✅ Google Drive authentication successful');

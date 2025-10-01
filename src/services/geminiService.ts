@@ -26,7 +26,7 @@ export interface ScriptAnalysis {
 export class GeminiService {
   private static instance: GeminiService;
   private apiKey: string = 'AIzaSyBobrL923Yn-gli8SvDj_ijxB5J7BSuaVE';
-  private baseUrl: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent';
+  private baseUrl: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
   public static getInstance(): GeminiService {
     if (!GeminiService.instance) {
@@ -43,9 +43,9 @@ export class GeminiService {
 
     console.log('🌍 Translating title to', targetLanguage);
     
-    const prompt = `Translate the following YouTube video title to ${targetLanguage}. Keep it natural and engaging, suitable for a video title. Only return the translated title, nothing else.
+    const prompt = `Translate this title to ${targetLanguage}. Return ONLY the translated title, no explanations:
 
-Title: "${title}"`;
+"${title}"`;
 
     try {
       const response = await this.callGeminiAPI(prompt);
@@ -64,9 +64,9 @@ Title: "${title}"`;
 
     console.log('🌍 Translating transcript to', targetLanguage);
     
-    const prompt = `Translate the following YouTube video transcript to ${targetLanguage}. Keep the natural flow and conversational tone. Maintain the speaker's personality and style. Only return the translated text, nothing else.
+    const prompt = `Translate this text to ${targetLanguage}. Return ONLY the translated text, no explanations:
 
-Transcript: "${transcript}"`;
+"${transcript}"`;
 
     try {
       const response = await this.callGeminiAPI(prompt);
