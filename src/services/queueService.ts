@@ -1,6 +1,8 @@
 import { AudioFile } from './audioStorage';
-import { googleDriveStorage } from './googleDriveStorage';
+import GoogleDriveStorageService from './googleDriveStorage';
 import { AzureTTSService } from './azureTTS';
+
+const googleDriveStorage = GoogleDriveStorageService.getInstance();
 
 export interface QueueItem {
   id: string;
