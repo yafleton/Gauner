@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, Trash2, RefreshCw, Download, AlertCircle, CheckCircle, Clock, Globe, Wand2, FileText, Youtube } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Play, Trash2, RefreshCw, Download, AlertCircle, CheckCircle, Clock, Wand2, FileText, Youtube } from 'lucide-react';
 import { youtubeTranscriptService } from '../../services/youtubeTranscriptService';
 import { geminiService } from '../../services/geminiService';
 import { queueService, QueueItem, QueueStats } from '../../services/queueService';
@@ -192,16 +192,6 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
     }
   };
 
-  // Format time remaining
-  const formatTimeRemaining = (date: Date) => {
-    const now = new Date();
-    const diff = date.getTime() - now.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
-    if (days > 0) return `${days} days left`;
-    if (days === 0) return 'Expires today';
-    return 'Expired';
-  };
 
   // Get status icon and color
   const getStatusDisplay = (status: string) => {

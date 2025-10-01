@@ -6,11 +6,6 @@ interface YouTubeVideoInfo {
   channelName?: string;
 }
 
-interface TranscriptSegment {
-  text: string;
-  start: number;
-  duration: number;
-}
 
 export class YouTubeTranscriptService {
   private static instance: YouTubeTranscriptService;
