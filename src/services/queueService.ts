@@ -128,32 +128,41 @@ class QueueService {
       item.progress = 10;
       this.notifyQueueUpdate();
 
-      // Generate audio
-      const audioArrayBuffer = await this.ttsService.synthesizeSpeech(
+      // Generate audio using the same method as AzureTTS component
+      const audioBuffer = await this.ttsService.synthesizeLongText(
         item.transcript,
         item.voice,
-        this.getLanguageCode(item.language)
+        this.getLanguageCode(item.language),
+        (current, total) => {
+          // Update progress during generation
+          item.progress = 10 + Math.round((current / total) * 50); // 10-60% for generation
+          this.notifyQueueUpdate();
+        }
       );
 
-      if (!audioArrayBuffer) {
+      if (!audioBuffer) {
         throw new Error('Failed to generate audio');
       }
 
-      const audioBlob = new Blob([audioArrayBuffer], { type: 'audio/wav' });
+      const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
 
       item.progress = 60;
       this.notifyQueueUpdate();
 
-      // Create audio file object
+      // Generate filename with timestamp like in AzureTTS
+      const timestamp = Date.now();
+      const generatedFilename = `${item.title.replace(/[^a-zA-Z0-9]/g, '_')}-${timestamp}.wav`;
+
+      // Create audio file object with same structure as AzureTTS
       const audioFile: AudioFile = {
         id: item.id,
         userId: item.userId || 'queue-user',
-        filename: `${item.title.replace(/[^a-zA-Z0-9]/g, '_')}.wav`,
+        filename: generatedFilename,
         blob: audioBlob,
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
         voice: item.voice,
-        text: item.transcript,
+        text: item.transcript.substring(0, 100), // First 100 chars like in AzureTTS
         size: audioBlob.size
       };
 

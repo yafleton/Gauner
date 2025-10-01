@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Play, Trash2, RefreshCw, Download, AlertCircle, CheckCircle, Clock, Wand2, FileText, Youtube } from 'lucide-react';
 import { youtubeTranscriptService } from '../../services/youtubeTranscriptService';
 import { geminiService } from '../../services/geminiService';
 import { queueService, QueueItem, QueueStats } from '../../services/queueService';
 import { ScriptAnalysis } from '../../services/geminiService';
 import { transcriptCleanupService } from '../../services/transcriptCleanupService';
+import { AzureTTSService } from '../../services/azureTTS';
 
 interface YouTubeQueueProps {
   user: any;
@@ -28,6 +29,29 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
   } | null>(null);
 
   const languages = geminiService.getSupportedLanguages();
+
+  // Initialize TTS service like in AzureTTS component
+  const ttsService = useMemo(() => {
+    const currentApiKey = user?.azureApiKey;
+    const currentRegion = user?.azureRegion || 'eastus';
+    
+    console.log('YouTubeQueue: Creating TTS service with:', {
+      userId: user?.id,
+      apiKey: currentApiKey ? `${currentApiKey.substring(0, 8)}...` : 'none',
+      region: currentRegion,
+      hasApiKey: !!currentApiKey
+    });
+    
+    return new AzureTTSService(currentApiKey || 'demo-key', currentRegion);
+  }, [user?.id, user?.azureApiKey, user?.azureRegion]);
+
+  // Initialize queue service with TTS service
+  useEffect(() => {
+    if (ttsService) {
+      queueService.setTTSService(ttsService);
+      console.log('✅ Queue service initialized with TTS service');
+    }
+  }, [ttsService]);
 
   // Load queue on component mount
   useEffect(() => {
