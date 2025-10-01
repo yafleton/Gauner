@@ -334,12 +334,12 @@ const AzureTTS: React.FC = () => {
           // Generate filename
           const timestamp = Date.now();
           const generatedFilename = customFilename.trim()
-            ? `${customFilename.trim()}.mp3`
-            : `tts-${timestamp}.mp3`;
+            ? `${customFilename.trim()}.wav`
+            : `tts-${timestamp}.wav`;
 
           // Save to user's audio storage
           if (user?.id) {
-            const audioBlob = new Blob([audioBuffer], { type: 'audio/mp3' });
+            const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
             
             // Create audio file object
             const audioFile = {
@@ -616,7 +616,7 @@ const AzureTTS: React.FC = () => {
                   value={customFilename}
                   onChange={(e) => setCustomFilename(e.target.value)}
                   className="input"
-                  placeholder="Enter custom filename (without .mp3 extension)"
+                  placeholder="Enter custom filename (without .wav extension)"
                   disabled={isLoading}
                   maxLength={50}
                 />

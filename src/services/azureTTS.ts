@@ -67,8 +67,8 @@ export class AzureTTSService {
     }
 
     try {
-      // Simple SSML without CDATA wrapping
-      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}"><voice name="${voice}">${text}</voice></speak>`;
+      // SSML with CDATA wrapping to prevent parsing issues
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}"><voice name="${voice}"><![CDATA[${text}]]></voice></speak>`;
 
       console.log('🔍 Azure TTS Request:', {
         voice,
@@ -86,7 +86,7 @@ export class AzureTTSService {
         headers: {
           'Ocp-Apim-Subscription-Key': this.apiKey,
           'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': 'audio-16khz-160kbitrate-mono-mp3',
+          'X-Microsoft-OutputFormat': 'riff-24khz-16bit-mono-pcm',
         },
         body: ssml,
       });
@@ -121,7 +121,7 @@ export class AzureTTSService {
       throw new Error('Azure TTS API key not configured. Please set up your Azure TTS API key.');
     }
 
-    const maxChunkLength = 5000; // Azure TTS limit is around 5000 characters per request
+    const maxChunkLength = 3000; // More conservative chunk size to avoid 400 errors
     const chunks = this.chunkText(text, maxChunkLength);
 
     const audioChunks: ArrayBuffer[] = [];
@@ -206,8 +206,8 @@ export class AzureTTSService {
     return combinedBuffer.buffer;
   }
 
-  downloadAudio(audioBuffer: ArrayBuffer, filename: string = 'speech.mp3'): void {
-    const blob = new Blob([audioBuffer], { type: 'audio/mp3' });
+  downloadAudio(audioBuffer: ArrayBuffer, filename: string = 'speech.wav'): void {
+    const blob = new Blob([audioBuffer], { type: 'audio/wav' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

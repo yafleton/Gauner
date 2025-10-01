@@ -168,14 +168,14 @@ class QueueService {
         throw new Error('Failed to generate audio');
       }
 
-      const audioBlob = new Blob([audioBuffer], { type: 'audio/mp3' });
+      const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
 
       item.progress = 60;
       this.notifyQueueUpdate();
 
       // Generate filename with timestamp like in AzureTTS
       const timestamp = Date.now();
-      const generatedFilename = `${item.title.replace(/[^a-zA-Z0-9]/g, '_')}-${timestamp}.mp3`;
+      const generatedFilename = `${item.title.replace(/[^a-zA-Z0-9]/g, '_')}-${timestamp}.wav`;
 
       // Create audio file object with same structure as AzureTTS
       const audioFile: AudioFile = {
@@ -309,7 +309,7 @@ class QueueService {
         throw new Error('Failed to generate audio');
       }
 
-      const audioBlob = new Blob([audioArrayBuffer], { type: 'audio/mp3' });
+      const audioBlob = new Blob([audioArrayBuffer], { type: 'audio/wav' });
 
       nextItem.progress = 60;
       this.notifyQueueUpdate();
@@ -318,7 +318,7 @@ class QueueService {
       const audioFile: AudioFile = {
         id: nextItem.id,
         userId: nextItem.userId || 'queue-user',
-        filename: `${nextItem.title.replace(/[^a-zA-Z0-9]/g, '_')}.mp3`,
+        filename: `${nextItem.title.replace(/[^a-zA-Z0-9]/g, '_')}.wav`,
         blob: audioBlob,
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
