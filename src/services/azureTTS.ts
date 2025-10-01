@@ -121,9 +121,19 @@ export class AzureTTSService {
       throw new Error('Azure TTS API key not configured. Please set up your Azure TTS API key.');
     }
 
-    const maxChunkLength = 2000; // Even smaller chunks to avoid MP3 concatenation issues
+    // For short texts, use single API call to avoid concatenation issues
+    if (text.length <= 5000) {
+      console.log('📝 Short text detected, using single API call to avoid concatenation issues');
+      if (onProgress) {
+        onProgress(1, 1);
+      }
+      return await this.synthesizeSpeech(text, voice, language);
+    }
+
+    const maxChunkLength = 8000; // Use larger chunks to minimize concatenation
     const chunks = this.chunkText(text, maxChunkLength);
 
+    console.log(`📝 Long text detected, splitting into ${chunks.length} chunks`);
     const audioChunks: ArrayBuffer[] = [];
 
     for (let i = 0; i < chunks.length; i++) {
