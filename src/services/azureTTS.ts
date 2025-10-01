@@ -68,19 +68,23 @@ export class AzureTTSService {
     }
 
     try {
-      const ssml = `
-        <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}">
-          <voice name="${voice}">
-            ${text}
-          </voice>
-        </speak>
-      `;
+      // Escape special characters for SSML
+      const escapedText = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${language}"><voice name="${voice}">${escapedText}</voice></speak>`;
 
       console.log('🔍 Azure TTS Request:', {
         voice,
         language,
         textLength: text.length,
         textPreview: text.substring(0, 50) + '...',
+        escapedTextPreview: escapedText.substring(0, 50) + '...',
+        ssmlPreview: ssml.substring(0, 200) + '...',
         apiKey: this.apiKey ? `${this.apiKey.substring(0, 8)}...` : 'none',
         region: this.region
       });
