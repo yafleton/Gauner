@@ -239,42 +239,25 @@ const AzureTTS: React.FC = () => {
               size: audioBlob.size,
             };
 
-            // Try to save to Google Drive first (for cross-device sync)
-            if (isGoogleDriveReady && googleDriveAuthStatus === 'authenticated') {
-              console.log('🔄 Uploading to Google Drive...');
-              const googleDriveResult = await googleDriveStorage.saveAudioFile(user.id, audioFile);
-              
-              if (googleDriveResult.success) {
-                console.log('✅ Audio file saved to Google Drive for cross-device access');
-                setShowSaveSuccess(true);
-                setTimeout(() => setShowSaveSuccess(false), 3000);
-              } else {
-                console.warn('⚠️ Failed to save to Google Drive:', googleDriveResult.error);
-                // Fallback to local storage
-                await audioStorage.saveAudio(
-                  user.id,
-                  audioBuffer,
-                  selectedVoice,
-                  text,
-                  filename
-                );
-                console.log('✅ Audio file saved to local storage as fallback');
-                setShowSaveSuccess(true);
-                setTimeout(() => setShowSaveSuccess(false), 3000);
-              }
-            } else {
-              // Save to local storage only
-              await audioStorage.saveAudio(
-                user.id,
-                audioBuffer,
-                selectedVoice,
-                text,
-                filename
-              );
-              console.log('✅ Audio file saved to local storage');
-              setShowSaveSuccess(true);
-              setTimeout(() => setShowSaveSuccess(false), 3000);
-            }
+    // Save ONLY to Google Drive (no localStorage fallback)
+    if (isGoogleDriveReady && googleDriveAuthStatus === 'authenticated') {
+      console.log('🔄 Uploading to Google Drive...');
+      const googleDriveResult = await googleDriveStorage.saveAudioFile(user.id, audioFile);
+      
+      if (googleDriveResult.success) {
+        console.log('✅ Audio file saved to Google Drive for cross-device access');
+        setShowSaveSuccess(true);
+        setTimeout(() => setShowSaveSuccess(false), 3000);
+      } else {
+        console.error('❌ Failed to save to Google Drive:', googleDriveResult.error);
+        alert('Failed to save audio to Google Drive. Please ensure you are connected to Google Drive.');
+        setShowSaveSuccess(false);
+      }
+    } else {
+      console.error('❌ Google Drive not ready or not authenticated');
+      alert('Google Drive not connected. Please connect to Google Drive to save audio files.');
+      setShowSaveSuccess(false);
+    }
 
             setCustomFilename('');
           }

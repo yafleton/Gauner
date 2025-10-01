@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Play, Pause, Download, Trash2, Clock, FileAudio, Cloud, Smartphone, Monitor } from 'lucide-react';
 import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
-import { AudioStorageService, AudioFile } from '../../services/audioStorage';
+import { AudioFile } from '../../services/audioStorage';
 import GoogleDriveStorageService, { GoogleDriveAudioFile } from '../../services/googleDriveStorage';
 
 const AudioLibrary: React.FC = () => {
@@ -12,7 +12,6 @@ const AudioLibrary: React.FC = () => {
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const audioStorage = useMemo(() => AudioStorageService.getInstance(), []);
   const googleDriveStorage = useMemo(() => GoogleDriveStorageService.getInstance(), []);
 
   const loadAudioFiles = useCallback(async () => {
@@ -30,27 +29,23 @@ const AudioLibrary: React.FC = () => {
       attempts++;
     }
     
-    // Load Google Drive files
+    // Load ONLY Google Drive files (no localStorage)
     try {
       console.log('🔍 Loading Google Drive files for user:', user.id);
       const googleDriveAudioFiles = await googleDriveStorage.getAudioFiles(user.id);
       console.log('📁 Google Drive files loaded:', googleDriveAudioFiles.length, googleDriveAudioFiles);
       setGoogleDriveFiles(googleDriveAudioFiles);
       
-      // Also load local files as backup display
-      const localFiles = audioStorage.getUserAudioFiles(user.id);
-      setAudioFiles(localFiles);
+      // Set empty local files array
+      setAudioFiles([]);
     } catch (error) {
       console.error('❌ Failed to load Google Drive files:', error);
       setGoogleDriveFiles([]);
-      
-      // Fallback to local files only
-      const localFiles = audioStorage.getUserAudioFiles(user.id);
-      setAudioFiles(localFiles);
+      setAudioFiles([]);
     }
     
     setIsLoading(false);
-  }, [user?.id, audioStorage, googleDriveStorage]);
+  }, [user?.id, googleDriveStorage]);
 
   useEffect(() => {
     if (user?.id) {

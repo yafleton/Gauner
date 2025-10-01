@@ -534,18 +534,6 @@ class GoogleDriveStorageService {
     }
 
     try {
-      // Get file metadata
-      const metadata = this.getFileMetadata(userId);
-      const file = metadata.find(f => f.id === fileId);
-      
-      if (!file) {
-        return {
-          success: false,
-          error: 'File not found'
-        };
-      }
-
-      // Delete from Google Drive
       const accessToken = localStorage.getItem('google_drive_access_token');
       if (!accessToken) {
         return {
@@ -554,7 +542,8 @@ class GoogleDriveStorageService {
         };
       }
 
-      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${file.driveFileId}`, {
+      // Delete audio file from Google Drive using the fileId directly
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${accessToken}`
@@ -565,8 +554,14 @@ class GoogleDriveStorageService {
         throw new Error(`Delete failed: ${response.statusText}`);
       }
 
-      // Remove from metadata
-      this.removeFileMetadata(fileId);
+      // Also try to delete metadata file
+      const metadataResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}_metadata`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
       window.dispatchEvent(new CustomEvent('googleDriveUpdate')); // Notify components of update
 
       console.log('🗑️ Audio file deleted from Google Drive:', fileId);
@@ -593,37 +588,9 @@ class GoogleDriveStorageService {
     });
   }
 
-  // Save file metadata to localStorage
-  private saveFileMetadata(file: GoogleDriveAudioFile): void {
-    const key = `gauner_drive_metadata_${file.userId}`;
-    const existing = this.getFileMetadata(file.userId);
-    existing.push(file);
-    localStorage.setItem(key, JSON.stringify(existing));
-    console.log('💾 Saved metadata for user', file.userId, ':', existing.length, 'total files');
-  }
+  // localStorage methods removed - using Google Drive only for cross-device sync
 
-  // Get file metadata from localStorage
-  private getFileMetadata(userId: string): GoogleDriveAudioFile[] {
-    const key = `gauner_drive_metadata_${userId}`;
-    const data = localStorage.getItem(key);
-    const files = data ? JSON.parse(data) : [];
-    console.log('📁 Retrieved metadata for user', userId, ':', files.length, 'files');
-    return files;
-  }
-
-  // Remove file metadata from localStorage
-  private removeFileMetadata(fileId: string): void {
-    // This is a simplified version - in practice you'd need to know the userId
-    // For now, we'll iterate through all stored metadata
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('gauner_drive_metadata_')) {
-        const data = JSON.parse(localStorage.getItem(key) || '[]');
-        const filtered = data.filter((file: GoogleDriveAudioFile) => file.id !== fileId);
-        localStorage.setItem(key, JSON.stringify(filtered));
-      }
-    }
-  }
+  // localStorage methods removed - using Google Drive only for cross-device sync
 
   // Save metadata to Google Drive for cross-device sync
   private async saveMetadataToDrive(file: GoogleDriveAudioFile, accessToken: string): Promise<void> {
