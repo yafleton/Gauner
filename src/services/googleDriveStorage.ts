@@ -339,7 +339,7 @@ class GoogleDriveStorageService {
     }
   }
 
-  // Save audio file to Google Drive
+  // Save audio file to Google Drive using backend server to avoid CORS
   async saveAudioFile(userId: string, audioFile: AudioFile): Promise<GoogleDriveStorageResponse> {
     console.log('💾 Starting Google Drive save for user:', userId);
     
@@ -366,18 +366,6 @@ class GoogleDriveStorageService {
     }
 
     try {
-      // Create user folder
-      console.log('📁 Creating/checking user folder for:', userId);
-      const folderId = await this.createUserFolder(userId);
-      if (!folderId) {
-        console.error('❌ Failed to create user folder');
-        return {
-          success: false,
-          error: 'Failed to create user folder'
-        };
-      }
-      console.log('✅ User folder ready, ID:', folderId);
-
       const accessToken = localStorage.getItem('google_drive_access_token');
       if (!accessToken) {
         return {
@@ -386,65 +374,59 @@ class GoogleDriveStorageService {
         };
       }
 
-      // Use resumable upload to avoid CORS issues
+      console.log('📤 Uploading via backend server to avoid CORS issues...');
+
+      // Use backend server for upload to avoid CORS issues
+      const formData = new FormData();
+      formData.append('audioFile', audioFile.blob, audioFile.filename);
+      formData.append('accessToken', accessToken);
+      formData.append('userId', userId);
+      formData.append('filename', audioFile.filename);
+      
+      // Prepare metadata for cross-device sync
       const metadata = {
-        name: audioFile.filename,
-        parents: [folderId]
+        ...audioFile,
+        userId,
+        uploadedAt: new Date().toISOString(),
+        deviceId: this.getDeviceId()
       };
+      formData.append('metadata', JSON.stringify(metadata));
 
-      // Step 1: Create the file metadata
-      const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+      const uploadResponse = await fetch('http://localhost:3001/api/upload-to-drive', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(metadata)
-      });
-
-      if (!createResponse.ok) {
-        throw new Error(`Failed to create file metadata: ${createResponse.statusText}`);
-      }
-
-      const createResult = await createResponse.json();
-      const fileId = createResult.id;
-
-      // Step 2: Upload the file content using resumable upload
-      const uploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'audio/wav'
-        },
-        body: audioFile.blob
+        body: formData
       });
 
       if (!uploadResponse.ok) {
-        throw new Error(`Failed to upload file content: ${uploadResponse.statusText}`);
+        const errorText = await uploadResponse.text();
+        throw new Error(`Backend upload failed: ${uploadResponse.status} - ${errorText}`);
       }
 
-      const driveFileId = fileId;
-      const driveUrl = `https://drive.google.com/file/d/${driveFileId}/view`;
+      const uploadResult = await uploadResponse.json();
+      
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || 'Upload failed');
+      }
+
+      const { fileId, fileUrl, folderId } = uploadResult.data;
+      const driveUrl = fileUrl || `https://drive.google.com/file/d/${fileId}/view`;
 
       const googleDriveAudioFile: GoogleDriveAudioFile = {
         ...audioFile,
         userId,
         uploadedAt: new Date().toISOString(),
         deviceId: this.getDeviceId(),
-        driveFileId,
+        driveFileId: fileId,
         driveUrl
       };
 
-      // Save metadata to Google Drive for cross-device sync
-      await this.saveMetadataToDrive(googleDriveAudioFile, accessToken);
-      
       // Notify components of update
       window.dispatchEvent(new CustomEvent('googleDriveUpdate'));
 
-      console.log('✅ Audio file saved to Google Drive:', {
+      console.log('✅ Audio file saved to Google Drive via backend:', {
         userId,
         fileName: audioFile.filename,
-        driveFileId,
+        driveFileId: fileId,
         driveUrl
       });
 

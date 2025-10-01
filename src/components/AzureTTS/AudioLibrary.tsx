@@ -109,7 +109,7 @@ const AudioLibrary: React.FC = () => {
     });
   }, [audioFiles, googleDriveFiles, isLoading, user]);
 
-  const handlePlayPause = (file: AudioFile) => {
+  const handlePlayPause = async (file: AudioFile | GoogleDriveAudioFile) => {
     if (playingId === file.id) {
       // Pause current audio
       if (audioElement) {
@@ -124,25 +124,58 @@ const AudioLibrary: React.FC = () => {
         audioElement.currentTime = 0;
       }
 
-      // Play new audio
-      const url = URL.createObjectURL(file.blob);
-      const audio = new Audio(url);
-      
-      audio.onended = () => {
-        setPlayingId(null);
-        setAudioElement(null);
-        URL.revokeObjectURL(url);
-      };
+      try {
+        let audioBlob: Blob;
+        
+        // Check if this is a Google Drive file
+        if ('driveFileId' in file) {
+          console.log('🎵 Loading Google Drive audio file:', file.driveFileId);
+          
+          // Load audio from Google Drive
+          const token = localStorage.getItem('google_drive_access_token');
+          if (!token) {
+            throw new Error('No Google Drive access token');
+          }
 
-      audio.onerror = () => {
-        setPlayingId(null);
-        setAudioElement(null);
-        URL.revokeObjectURL(url);
-      };
+          const response = await fetch(`https://www.googleapis.com/drive/v3/files/${file.driveFileId}?alt=media`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
 
-      audio.play();
-      setAudioElement(audio);
-      setPlayingId(file.id);
+          if (!response.ok) {
+            throw new Error(`Failed to load audio from Google Drive: ${response.statusText}`);
+          }
+
+          audioBlob = await response.blob();
+        } else {
+          // Regular local file
+          audioBlob = file.blob;
+        }
+
+        // Play the audio
+        const url = URL.createObjectURL(audioBlob);
+        const audio = new Audio(url);
+        
+        audio.onended = () => {
+          setPlayingId(null);
+          setAudioElement(null);
+          URL.revokeObjectURL(url);
+        };
+
+        audio.onerror = () => {
+          setPlayingId(null);
+          setAudioElement(null);
+          URL.revokeObjectURL(url);
+        };
+
+        await audio.play();
+        setAudioElement(audio);
+        setPlayingId(file.id);
+      } catch (error) {
+        console.error('❌ Error playing audio:', error);
+        alert(`Failed to play audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   };
 
@@ -340,6 +373,17 @@ const AudioLibrary: React.FC = () => {
 
                   {/* Actions */}
                   <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => handlePlayPause(file)}
+                      className="w-6 h-6 bg-green-600/20 rounded-full flex items-center justify-center hover:bg-green-600/30 transition-colors"
+                      title="Play/Pause"
+                    >
+                      {playingId === file.id ? (
+                        <Pause size={10} className="text-green-400" />
+                      ) : (
+                        <Play size={10} className="text-green-400 ml-0.5" />
+                      )}
+                    </button>
                     <button
                       onClick={() => window.open(file.driveUrl, '_blank')}
                       className="p-1 text-text-secondary hover:text-green-400 transition-colors"

@@ -4,13 +4,27 @@ const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const multer = require('multer');
+const { google } = require('googleapis');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit
+  }
+});
+
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'https://your-domain.com'],
+  credentials: true
+}));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -192,6 +206,127 @@ app.post('/api/transcript', async (req, res) => {
     });
   }
 });
+
+// Google Drive upload endpoint
+app.post('/api/upload-to-drive', upload.single('audioFile'), async (req, res) => {
+  try {
+    const { accessToken, userId, filename, metadata } = req.body;
+    
+    if (!accessToken || !userId || !req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: accessToken, userId, or audioFile'
+      });
+    }
+
+    console.log(`📤 Uploading audio file to Google Drive for user: ${userId}`);
+    
+    // Initialize Google Drive API
+    const auth = new google.auth.OAuth2();
+    auth.setCredentials({ access_token: accessToken });
+    const drive = google.drive({ version: 'v3', auth });
+
+    // Create or find user folder
+    const folderName = `GaunerAudio_${userId}`;
+    let folderId = await findOrCreateFolder(drive, folderName);
+    
+    if (!folderId) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to create user folder'
+      });
+    }
+
+    // Upload file metadata
+    const fileMetadata = {
+      name: filename || `audio_${Date.now()}.wav`,
+      parents: [folderId]
+    };
+
+    // Upload the file
+    const media = {
+      mimeType: 'audio/wav',
+      body: req.file.buffer
+    };
+
+    const response = await drive.files.create({
+      resource: fileMetadata,
+      media: media,
+      fields: 'id,name,webViewLink'
+    });
+
+    const fileId = response.data.id;
+    const fileUrl = response.data.webViewLink;
+
+    console.log(`✅ Successfully uploaded to Google Drive: ${fileId}`);
+
+    // Save metadata if provided
+    if (metadata) {
+      try {
+        const metadataBlob = new Blob([JSON.stringify(metadata)], { type: 'application/json' });
+        const metadataResponse = await drive.files.create({
+          resource: {
+            name: `${fileId}_metadata.json`,
+            parents: [folderId]
+          },
+          media: {
+            mimeType: 'application/json',
+            body: Buffer.from(JSON.stringify(metadata))
+          }
+        });
+        console.log(`✅ Metadata saved: ${metadataResponse.data.id}`);
+      } catch (metadataError) {
+        console.warn('⚠️ Failed to save metadata:', metadataError);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        fileId,
+        fileUrl,
+        folderId
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Google Drive upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: `Upload failed: ${error.message}`
+    });
+  }
+});
+
+// Helper function to find or create folder
+async function findOrCreateFolder(drive, folderName) {
+  try {
+    // Search for existing folder
+    const response = await drive.files.list({
+      q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder'`,
+      fields: 'files(id,name)'
+    });
+
+    if (response.data.files.length > 0) {
+      console.log(`📁 Found existing folder: ${folderName}`);
+      return response.data.files[0].id;
+    }
+
+    // Create new folder
+    const folderResponse = await drive.files.create({
+      resource: {
+        name: folderName,
+        mimeType: 'application/vnd.google-apps.folder'
+      }
+    });
+
+    console.log(`📁 Created new folder: ${folderName}`);
+    return folderResponse.data.id;
+  } catch (error) {
+    console.error('❌ Error with folder operation:', error);
+    return null;
+  }
+}
 
 // Error handling middleware
 app.use((error, req, res, next) => {

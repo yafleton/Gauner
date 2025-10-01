@@ -78,10 +78,28 @@ export class YouTubeTranscriptService {
       
       // First try backend service (most reliable)
       try {
+        console.log('🎯 Attempting backend yt-dlp extraction...');
         transcript = await this.fetchTranscriptFromBackend(videoId);
+        console.log('✅ Backend extraction successful');
       } catch (backendError) {
-        console.log('🔄 Backend service unavailable, trying proxy methods...');
-        transcript = await this.fetchTranscriptFromProxy(videoId);
+        console.log('⚠️ Backend service failed:', backendError instanceof Error ? backendError.message : backendError);
+        console.log('🔄 Falling back to proxy methods...');
+        
+        try {
+          transcript = await this.fetchTranscriptFromProxy(videoId);
+          console.log('✅ Proxy extraction successful');
+        } catch (proxyError) {
+          console.log('⚠️ Proxy methods failed:', proxyError instanceof Error ? proxyError.message : proxyError);
+          console.log('🔄 Trying public services...');
+          
+          try {
+            transcript = await this.fetchTranscriptFromPublicServices(videoId);
+            console.log('✅ Public services extraction successful');
+          } catch (publicError) {
+            console.log('⚠️ Public services failed:', publicError instanceof Error ? publicError.message : publicError);
+            throw new Error('All transcript extraction methods failed. The video may not have captions or auto-generated subtitles.');
+          }
+        }
       }
       
       if (!transcript || transcript.trim().length < 10) {
@@ -206,7 +224,9 @@ export class YouTubeTranscriptService {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ videoId })
+        body: JSON.stringify({ videoId }),
+        // Add timeout to prevent hanging
+        signal: AbortSignal.timeout(30000) // 30 second timeout
       });
       
       console.log('📡 Backend response status:', response.status);
@@ -215,11 +235,11 @@ export class YouTubeTranscriptService {
         const data = await response.json();
         console.log('📄 Backend response data:', { success: data.success, transcriptLength: data.transcript?.length });
         
-        if (data.success && data.transcript) {
+        if (data.success && data.transcript && data.transcript.trim().length > 10) {
           console.log('✅ Successfully extracted transcript from backend yt-dlp service');
-          return data.transcript;
+          return this.parseTranscriptText(data.transcript);
         } else {
-          throw new Error(data.error || 'Backend service failed');
+          throw new Error(data.error || 'No transcript available from backend');
         }
       } else {
         const errorText = await response.text();
@@ -227,6 +247,10 @@ export class YouTubeTranscriptService {
         throw new Error(`Backend service error: ${response.status} - ${errorText}`);
       }
     } catch (error) {
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        console.warn('❌ Backend service timed out:', error);
+        throw new Error('Backend service timed out. Please try again.');
+      }
       console.warn('❌ Backend yt-dlp service failed:', error);
       throw error;
     }
