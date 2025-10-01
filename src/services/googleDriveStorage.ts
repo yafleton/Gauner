@@ -387,7 +387,7 @@ class GoogleDriveStorageService {
       };
 
       // Find or create user folder first
-      const folderId = await this.findOrCreateUserFolder(userId, accessToken);
+      const folderId = await this.createUserFolder(userId);
       
       // Upload file to Google Drive
       const formData = new FormData();
