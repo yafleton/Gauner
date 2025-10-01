@@ -375,14 +375,8 @@ class GoogleDriveStorageService {
         };
       }
 
-      console.log('📤 Uploading via backend server to avoid CORS issues...');
-
-      // Use backend server for upload to avoid CORS issues
-      const formData = new FormData();
-      formData.append('audioFile', audioFile.blob, audioFile.filename);
-      formData.append('accessToken', accessToken);
-      formData.append('userId', userId);
-      formData.append('filename', audioFile.filename);
+      // Upload directly to Google Drive API to avoid backend dependency
+      console.log('📤 Uploading directly to Google Drive API...');
       
       // Prepare metadata for cross-device sync
       const metadata = {
@@ -391,27 +385,39 @@ class GoogleDriveStorageService {
         uploadedAt: new Date().toISOString(),
         deviceId: this.getDeviceId()
       };
-      formData.append('metadata', JSON.stringify(metadata));
 
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
-      const uploadResponse = await fetch(`${backendUrl}/api/upload-to-drive`, {
+      // Find or create user folder first
+      const folderId = await this.findOrCreateUserFolder(userId, accessToken);
+      
+      // Upload file to Google Drive
+      const formData = new FormData();
+      
+      // Create file metadata
+      const fileMetadata = {
+        name: audioFile.filename,
+        parents: [folderId],
+        description: JSON.stringify(metadata)
+      };
+      
+      formData.append('metadata', JSON.stringify(fileMetadata));
+      formData.append('media', audioFile.blob, audioFile.filename);
+      
+      const uploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
         body: formData
       });
 
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
-        throw new Error(`Backend upload failed: ${uploadResponse.status} - ${errorText}`);
+        throw new Error(`Google Drive upload failed: ${uploadResponse.status} - ${errorText}`);
       }
 
       const uploadResult = await uploadResponse.json();
-      
-      if (!uploadResult.success) {
-        throw new Error(uploadResult.error || 'Upload failed');
-      }
-
-      const { fileId, fileUrl } = uploadResult.data;
-      const driveUrl = fileUrl || `https://drive.google.com/file/d/${fileId}/view`;
+      const fileId = uploadResult.id;
+      const driveUrl = `https://drive.google.com/file/d/${fileId}/view`;
 
       const googleDriveAudioFile: GoogleDriveAudioFile = {
         ...audioFile,
@@ -425,7 +431,7 @@ class GoogleDriveStorageService {
       // Notify components of update
       window.dispatchEvent(new CustomEvent('googleDriveUpdate'));
 
-      console.log('✅ Audio file saved to Google Drive via backend:', {
+      console.log('✅ Audio file saved to Google Drive:', {
         userId,
         fileName: audioFile.filename,
         driveFileId: fileId,
