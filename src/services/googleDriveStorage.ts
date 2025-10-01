@@ -392,7 +392,8 @@ class GoogleDriveStorageService {
       };
       formData.append('metadata', JSON.stringify(metadata));
 
-      const uploadResponse = await fetch('http://localhost:3001/api/upload-to-drive', {
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
+      const uploadResponse = await fetch(`${backendUrl}/api/upload-to-drive`, {
         method: 'POST',
         body: formData
       });

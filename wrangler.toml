@@ -1,5 +1,12 @@
-name = "gauner-niche-finder"
-compatibility_date = "2024-01-01"
+name = "gauner-backend"
+main = "worker.js"
+compatibility_date = "2023-10-30"
 
-# Pages configuration for static hosting
-pages_build_output_dir = "build"
+# Environment variables (if needed)
+# [vars]
+# API_KEY = "your-api-key-here"
+
+# Routes (optional - for custom domain)
+# routes = [
+#   { pattern = "api.gauner.com/*", zone_name = "gauner.com" }
+# ]

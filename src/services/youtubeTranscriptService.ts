@@ -219,7 +219,8 @@ export class YouTubeTranscriptService {
     try {
       console.log('🔍 Trying backend yt-dlp service for video:', videoId);
       
-      const response = await fetch('http://localhost:3001/api/transcript', {
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/transcript`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
