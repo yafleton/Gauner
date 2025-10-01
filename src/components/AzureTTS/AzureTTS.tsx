@@ -65,12 +65,14 @@ const AzureTTS: React.FC = () => {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setError(`Failed to load voices: ${errorMessage}`);
     } finally {
+      console.log('🔄 Voice loading completed, setting isLoading to false');
       setIsLoading(false);
     }
   }, [ttsService]);
 
   useEffect(() => {
     if (ttsService) {
+      console.log('🔄 useEffect: Loading voices because ttsService changed');
       loadVoices();
     }
   }, [ttsService, loadVoices]);
