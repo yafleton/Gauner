@@ -291,15 +291,25 @@ const AzureTTS: React.FC = () => {
   }, [voices, selectedLanguage, selectedVoice, getLanguageVoices]);
 
   const handleSynthesize = async () => {
+    console.log('🎵 handleSynthesize called');
+    console.log('🔍 handleSynthesize - ttsService:', !!ttsService);
+    console.log('🔍 handleSynthesize - selectedVoice:', selectedVoice);
+    console.log('🔍 handleSynthesize - text length:', text.trim().length);
+    
     if (!ttsService || !selectedVoice || !text.trim()) {
+      console.log('❌ handleSynthesize - validation failed');
       setError('Please provide text and select a voice.');
       return;
     }
 
+    console.log('✅ handleSynthesize - validation passed, starting synthesis');
+    
     try {
       setIsLoading(true);
       setError('');
       setProgress({ current: 0, total: 0 });
+      
+      console.log('🔄 handleSynthesize - starting Azure TTS call');
 
       // Convert language name to language code for Azure TTS
       const languageCodeMap: { [key: string]: string } = {
@@ -324,12 +334,24 @@ const AzureTTS: React.FC = () => {
       
       const languageCode = languageCodeMap[selectedLanguage] || selectedLanguage;
 
+      console.log('🎯 About to call synthesizeLongText with:', {
+        textLength: text.length,
+        selectedVoice,
+        languageCode,
+        ttsServiceExists: !!ttsService
+      });
+
       const audioBuffer = await ttsService.synthesizeLongText(
         text,
         selectedVoice,
         languageCode,
-        (current, total) => setProgress({ current, total })
+        (current, total) => {
+          console.log(`📊 Progress: ${current}/${total}`);
+          setProgress({ current, total });
+        }
       );
+
+      console.log('✅ synthesizeLongText completed, audioBuffer size:', audioBuffer.byteLength);
 
       // Generate filename
       const timestamp = Date.now();
