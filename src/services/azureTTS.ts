@@ -105,12 +105,14 @@ export class AzureTTSService {
       }
 
       const audioBuffer = await response.arrayBuffer();
+      const firstBytes = new Uint8Array(audioBuffer.slice(0, 16));
       console.log('🔍 Azure TTS Response:', {
         status: response.status,
         contentType: response.headers.get('content-type'),
         contentLength: response.headers.get('content-length'),
         audioBufferSize: audioBuffer.byteLength,
-        firstBytes: new Uint8Array(audioBuffer.slice(0, 16))
+        firstBytes: Array.from(firstBytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '),
+        isValidMP3: firstBytes[0] === 0xFF && (firstBytes[1] & 0xE0) === 0xE0
       });
 
       return audioBuffer;

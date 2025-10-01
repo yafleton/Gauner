@@ -355,6 +355,19 @@ const AzureTTS: React.FC = () => {
 
       console.log('✅ synthesizeLongText completed, audioBuffer size:', audioBuffer.byteLength);
 
+      // Test: Download the audio file directly to verify it's not corrupt
+      const testBlob = new Blob([audioBuffer], { type: 'audio/mp3' });
+      const testUrl = URL.createObjectURL(testBlob);
+      console.log('🔍 Test audio URL created:', testUrl);
+      
+      // Create a temporary download link to test the file
+      const testLink = document.createElement('a');
+      testLink.href = testUrl;
+      testLink.download = 'test-direct.mp3';
+      testLink.style.display = 'none';
+      document.body.appendChild(testLink);
+      console.log('🔍 Test download link created - check your downloads folder for test-direct.mp3');
+
       // Generate filename
       const timestamp = Date.now();
       const generatedFilename = customFilename.trim()
