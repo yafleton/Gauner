@@ -334,7 +334,10 @@ class GoogleDriveStorageService {
         driveUrl
       };
 
-      // Save metadata to localStorage (since we don't have a database)
+      // Save metadata to Google Drive for cross-device sync
+      await this.saveMetadataToDrive(googleDriveAudioFile, accessToken);
+      
+      // Also save to localStorage as backup
       this.saveFileMetadata(googleDriveAudioFile);
       window.dispatchEvent(new CustomEvent('googleDriveUpdate')); // Notify components of update
 
@@ -363,43 +366,67 @@ class GoogleDriveStorageService {
     }
 
     try {
-      // Get files from localStorage metadata
-      const metadata = this.getFileMetadata(userId);
-      
-      // Verify files still exist in Google Drive
-      const verifiedFiles: GoogleDriveAudioFile[] = [];
       const accessToken = localStorage.getItem('google_drive_access_token');
-      
       if (!accessToken) {
         console.warn('⚠️ No access token available for file verification');
-        return metadata;
+        return this.getFileMetadata(userId);
       }
+
+      // Get user folder
+      const folderName = `GaunerAudio_${userId}`;
+      const folder = await this.findFolder(folderName, accessToken);
       
-      for (const file of metadata) {
-        try {
-          const response = await fetch(`https://www.googleapis.com/drive/v3/files/${file.driveFileId}?fields=id,name,size,modifiedTime`, {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`
-            }
-          });
+      if (!folder) {
+        console.log('📁 No user folder found, returning local metadata');
+        return this.getFileMetadata(userId);
+      }
+
+      // Get all files from user folder
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files?q='${folder.id}' in parents&fields=files(id,name,mimeType,size,modifiedTime)`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      if (!response.ok) {
+        console.warn('⚠️ Failed to list files from Google Drive');
+        return this.getFileMetadata(userId);
+      }
+
+      const result = await response.json();
+      const audioFiles: GoogleDriveAudioFile[] = [];
+
+      // Process audio files and metadata files
+      for (const file of result.files) {
+        if (file.mimeType === 'audio/wav') {
+          // This is an audio file, try to find its metadata
+          const metadataFile = result.files.find((f: any) => f.name === `metadata_${file.id}.json`);
           
-          if (response.ok) {
-            verifiedFiles.push(file);
-          } else {
-            console.warn('⚠️ File not found in Google Drive, removing from metadata:', file.filename);
-            this.removeFileMetadata(file.id);
+          if (metadataFile) {
+            try {
+              // Download metadata
+              const metadataResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${metadataFile.id}?alt=media`, {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`
+                }
+              });
+              
+              if (metadataResponse.ok) {
+                const metadata = await metadataResponse.json();
+                audioFiles.push(metadata);
+              }
+            } catch (error) {
+              console.warn('⚠️ Failed to load metadata for file:', file.name);
+            }
           }
-        } catch (error) {
-          console.warn('⚠️ File not found in Google Drive, removing from metadata:', file.filename);
-          this.removeFileMetadata(file.id);
         }
       }
 
-      console.log('📥 Retrieved audio files from Google Drive:', verifiedFiles.length);
-      return verifiedFiles;
+      console.log('📥 Retrieved audio files from Google Drive:', audioFiles.length);
+      return audioFiles;
     } catch (error) {
       console.error('❌ Google Drive retrieval error:', error);
-      return [];
+      return this.getFileMetadata(userId);
     }
   }
 
@@ -501,6 +528,54 @@ class GoogleDriveStorageService {
         const filtered = data.filter((file: GoogleDriveAudioFile) => file.id !== fileId);
         localStorage.setItem(key, JSON.stringify(filtered));
       }
+    }
+  }
+
+  // Save metadata to Google Drive for cross-device sync
+  private async saveMetadataToDrive(file: GoogleDriveAudioFile, accessToken: string): Promise<void> {
+    try {
+      const metadataContent = JSON.stringify(file);
+      const metadataBlob = new Blob([metadataContent], { type: 'application/json' });
+      
+      // Get user folder
+      const folderName = `GaunerAudio_${file.userId}`;
+      const folder = await this.findFolder(folderName, accessToken);
+      
+      if (!folder) {
+        console.warn('⚠️ User folder not found for metadata save');
+        return;
+      }
+      
+      // Create metadata file in Google Drive
+      const metadataResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: `metadata_${file.id}.json`,
+          parents: [folder.id] // Use same folder as audio file
+        })
+      });
+
+      if (metadataResponse.ok) {
+        const metadataResult = await metadataResponse.json();
+        
+        // Upload metadata content
+        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${metadataResult.id}?uploadType=media`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: metadataBlob
+        });
+        
+        console.log('✅ Metadata saved to Google Drive for cross-device sync');
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to save metadata to Google Drive:', error);
     }
   }
 
