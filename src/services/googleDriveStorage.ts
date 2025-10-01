@@ -403,7 +403,7 @@ class GoogleDriveStorageService {
       for (const file of result.files) {
         if (file.mimeType === 'audio/wav') {
           // This is an audio file, try to find its metadata
-          const metadataFile = result.files.find((f: any) => f.name === `metadata_${file.id}.json`);
+          const metadataFile = result.files.find((f: any) => f.name === `${file.id}_metadata.json`);
           
           if (metadataFile) {
             try {
@@ -557,6 +557,7 @@ class GoogleDriveStorageService {
   // Save metadata to Google Drive for cross-device sync
   private async saveMetadataToDrive(file: GoogleDriveAudioFile, accessToken: string): Promise<void> {
     try {
+      // Create a simple metadata file with the audio file ID in the name
       const metadataContent = JSON.stringify(file);
       const metadataBlob = new Blob([metadataContent], { type: 'application/json' });
       
@@ -569,7 +570,7 @@ class GoogleDriveStorageService {
         return;
       }
       
-      // Create metadata file in Google Drive
+      // Create metadata file with audio file ID in the name for easy matching
       const metadataResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
         method: 'POST',
         headers: {
@@ -577,8 +578,8 @@ class GoogleDriveStorageService {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          name: `metadata_${file.id}.json`,
-          parents: [folder.id] // Use same folder as audio file
+          name: `${file.driveFileId}_metadata.json`, // Use audio file ID as prefix
+          parents: [folder.id]
         })
       });
 
@@ -595,7 +596,7 @@ class GoogleDriveStorageService {
           body: metadataBlob
         });
         
-        console.log('✅ Metadata saved to Google Drive for cross-device sync');
+        console.log('✅ Metadata saved to Google Drive for cross-device sync:', `${file.driveFileId}_metadata.json`);
       }
     } catch (error) {
       console.warn('⚠️ Failed to save metadata to Google Drive:', error);
