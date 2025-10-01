@@ -72,10 +72,15 @@ export class YouTubeTranscriptService {
     const videoInfo = await this.getVideoInfo(videoId);
     console.log('📝 Video info:', videoInfo);
 
-    // For transcript extraction, we'll use a CORS proxy approach
-    // Note: This is a simplified approach. In production, you might want to use a backend service
+    // Try to extract transcript using multiple methods
     try {
       const transcript = await this.fetchTranscriptFromProxy(videoId);
+      
+      if (!transcript || transcript.trim().length < 10) {
+        throw new Error('Transcript is too short or empty');
+      }
+      
+      console.log('✅ Successfully extracted transcript, length:', transcript.length);
       
       return {
         title: videoInfo.title,
@@ -86,15 +91,102 @@ export class YouTubeTranscriptService {
       };
     } catch (error) {
       console.error('❌ Failed to extract transcript:', error);
-      throw new Error(`Failed to extract transcript: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Provide more helpful error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('No transcript available')) {
+        throw new Error('No transcript available for this video. Please ensure the video has captions or auto-generated subtitles enabled. You can check this by opening the video on YouTube and looking for the CC (captions) button.');
+      }
+      
+      throw new Error(`Failed to extract transcript: ${errorMessage}`);
     }
   }
 
-  // Fetch transcript using yt-dlp style approach
+  // Fetch transcript using public API services
   private async fetchTranscriptFromProxy(videoId: string): Promise<string> {
     console.log('🔍 Attempting to extract transcript for video:', videoId);
     
-    // First, try to get the video page to extract transcript URLs
+    // Try public transcript API services first
+    const apiServices = [
+      // YouTube Transcript API
+      `https://youtubetranscript.com/?server_vid2=${videoId}`,
+      `https://youtubetranscript.com/?server_vid=${videoId}`,
+      
+      // Alternative transcript services
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`,
+      
+      // Try with different language codes
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-GB`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=auto`,
+    ];
+
+    for (const apiUrl of apiServices) {
+      try {
+        console.log('🔍 Trying API service:', apiUrl);
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://www.youtube.com/',
+            'Origin': 'https://www.youtube.com'
+          }
+        });
+
+        if (response.ok) {
+          const text = await response.text();
+          if (text && text.trim().length > 0) {
+            console.log('📄 Got response from API, parsing...');
+            
+            // Try to parse as JSON first (for transcript APIs)
+            if (text.trim().startsWith('[') || text.trim().startsWith('{')) {
+              try {
+                const data = JSON.parse(text);
+                if (Array.isArray(data)) {
+                  // Format: [{"text": "...", "start": 0, "duration": 2.5}, ...]
+                  const transcript = data.map((item: any) => item.text || item.content || '').join(' ').trim();
+                  if (transcript.length > 10) {
+                    console.log('✅ Successfully extracted transcript from API (JSON format)');
+                    return transcript;
+                  }
+                } else if (data.text || data.transcript) {
+                  // Format: {"text": "...", "transcript": "..."}
+                  const transcript = data.text || data.transcript || '';
+                  if (transcript.length > 10) {
+                    console.log('✅ Successfully extracted transcript from API (object format)');
+                    return transcript;
+                  }
+                }
+              } catch (parseError) {
+                console.warn('❌ Failed to parse JSON response:', parseError);
+              }
+            }
+            
+            // Try to parse as transcript text
+            const parsedTranscript = this.parseTranscriptText(text);
+            if (parsedTranscript.trim().length > 10) {
+              console.log('✅ Successfully extracted transcript from API (text format)');
+              return parsedTranscript;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('❌ Failed to fetch from API service:', apiUrl, error);
+      }
+    }
+
+    // If API services fail, try HTML parsing approach
+    console.log('🔄 API services failed, trying HTML parsing approach...');
+    return this.fetchTranscriptFromHtml(videoId);
+  }
+
+  // Fetch transcript by parsing HTML page
+  private async fetchTranscriptFromHtml(videoId: string): Promise<string> {
     try {
       const videoPageUrl = `https://www.youtube.com/watch?v=${videoId}`;
       console.log('📄 Fetching video page to extract transcript URLs...');
@@ -115,7 +207,7 @@ export class YouTubeTranscriptService {
         const pageHtml = await pageResponse.text();
         console.log('📄 Got video page HTML, extracting transcript URLs...');
         
-        // Extract transcript URLs from the page HTML (similar to yt-dlp)
+        // Extract transcript URLs from the page HTML
         const transcriptUrls = this.extractTranscriptUrlsFromHtml(pageHtml, videoId);
         console.log('🔍 Found transcript URLs:', transcriptUrls);
         
@@ -151,8 +243,8 @@ export class YouTubeTranscriptService {
       console.warn('❌ Failed to fetch video page:', error);
     }
 
-    // If page extraction fails, try direct API methods
-    console.log('🔄 Page extraction failed, trying direct API methods...');
+    // If HTML parsing fails, try alternative methods
+    console.log('🔄 HTML parsing failed, trying alternative methods...');
     return this.fetchTranscriptAlternative(videoId);
   }
 
