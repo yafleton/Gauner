@@ -23,7 +23,7 @@ const AzureTTS: React.FC = () => {
   const [isGoogleDriveReady, setIsGoogleDriveReady] = useState(false);
   const [googleDriveAuthStatus, setGoogleDriveAuthStatus] = useState<'checking' | 'authenticated' | 'not-authenticated' | 'error'>('checking');
 
-  const audioStorage = useMemo(() => AudioStorageService.getInstance(), []);
+  // audioStorage removed - using Google Drive only
   const googleDriveStorage = useMemo(() => GoogleDriveStorageService.getInstance(), []);
 
   const ttsService = useMemo(() => {
@@ -218,7 +218,7 @@ const AzureTTS: React.FC = () => {
 
           // Generate filename
           const timestamp = Date.now();
-          const filename = customFilename.trim() 
+          const generatedFilename = customFilename.trim() 
             ? `${customFilename.trim()}.wav`
             : `tts-${timestamp}.wav`;
 
@@ -230,7 +230,7 @@ const AzureTTS: React.FC = () => {
             const audioFile = {
               id: uuidv4(),
               userId: user.id,
-              filename: customFilename.trim() || `audio-${timestamp}.wav`,
+              filename: generatedFilename,
               blob: audioBlob,
               createdAt: new Date(),
               expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days

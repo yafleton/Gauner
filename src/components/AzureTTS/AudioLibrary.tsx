@@ -4,6 +4,31 @@ import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
 import { AudioFile } from '../../services/audioStorage';
 import GoogleDriveStorageService, { GoogleDriveAudioFile } from '../../services/googleDriveStorage';
 
+// Utility functions
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
+const formatTimeRemaining = (expiresAt: Date): string => {
+  const now = new Date();
+  const timeLeft = expiresAt.getTime() - now.getTime();
+  
+  if (timeLeft <= 0) return 'Expired';
+  
+  const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  
+  if (days > 0) return `${days}d ${hours}h left`;
+  if (hours > 0) return `${hours}h left`;
+  
+  const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+  return `${minutes}m left`;
+};
+
 const AudioLibrary: React.FC = () => {
   const { user } = useSimpleAuth();
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
@@ -135,7 +160,7 @@ const AudioLibrary: React.FC = () => {
   const handleDelete = async (fileId: string) => {
     if (!user?.id) return;
     
-    if (await audioStorage.deleteAudioFile(fileId, user.id)) {
+    if (await googleDriveStorage.deleteAudioFile(user.id, fileId)) {
       loadAudioFiles(); // Refresh the list
       
       // Stop playing if this file was playing
@@ -173,7 +198,11 @@ const AudioLibrary: React.FC = () => {
     if (!user?.id) return;
     
     if (window.confirm('Are you sure you want to delete all your audio files?')) {
-      const deletedCount = await audioStorage.deleteAllUserFiles(user.id);
+      // Delete all files from Google Drive
+      const deletedCount = googleDriveFiles.length;
+      for (const file of googleDriveFiles) {
+        await googleDriveStorage.deleteAudioFile(user.id, file.id);
+      }
       if (deletedCount > 0) {
         loadAudioFiles(); // Refresh the list
         
@@ -189,8 +218,11 @@ const AudioLibrary: React.FC = () => {
 
   const stats = useMemo(() => {
     if (!user?.id) return { count: 0, totalSize: 0 };
-    return audioStorage.getStorageStats(user.id);
-  }, [user?.id, audioStorage]);
+    // Calculate stats from Google Drive files
+    const totalSize = googleDriveFiles.reduce((sum, file) => sum + file.size, 0);
+    const totalFiles = googleDriveFiles.length;
+    return { totalSize, totalFiles };
+  }, [googleDriveFiles, user?.id]);
 
 
   if (!user) {
@@ -252,7 +284,7 @@ const AudioLibrary: React.FC = () => {
           </div>
           <div className="bg-bg-secondary/30 rounded-lg p-3 text-center">
             <div className="text-lg font-semibold text-text-primary">
-              {audioStorage.formatFileSize(stats.totalSize)}
+              {formatFileSize(stats.totalSize)}
             </div>
             <div className="text-xs text-text-secondary">Total Size</div>
           </div>
@@ -289,7 +321,7 @@ const AudioLibrary: React.FC = () => {
                         {file.filename}
                       </h3>
                       <span className="text-xs text-text-secondary bg-green-900/30 px-2 py-0.5 rounded text-nowrap ml-2">
-                        {audioStorage.formatFileSize(file.size)}
+                        {formatFileSize(file.size)}
                       </span>
                     </div>
 
@@ -365,7 +397,7 @@ const AudioLibrary: React.FC = () => {
                       {file.filename}
                     </h3>
                     <span className="text-xs text-text-secondary bg-bg-secondary/50 px-2 py-0.5 rounded text-nowrap ml-2">
-                      {audioStorage.formatFileSize(file.size)}
+                      {formatFileSize(file.size)}
                     </span>
                   </div>
 
@@ -373,7 +405,7 @@ const AudioLibrary: React.FC = () => {
                     <span className="truncate">Voice: {file.voice}</span>
                     <span className="flex items-center text-nowrap">
                       <Clock size={10} className="mr-1" />
-                      {audioStorage.formatTimeRemaining(file.expiresAt)}
+                      {formatTimeRemaining(file.expiresAt)}
                     </span>
                   </div>
 

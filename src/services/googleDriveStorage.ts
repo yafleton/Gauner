@@ -554,12 +554,14 @@ class GoogleDriveStorageService {
         throw new Error(`Delete failed: ${response.statusText}`);
       }
 
-      // Also try to delete metadata file
-      const metadataResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}_metadata`, {
+      // Also try to delete metadata file (ignore errors)
+      await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}_metadata`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${accessToken}`
         }
+      }).catch(() => {
+        // Metadata file might not exist, ignore error
       });
 
       window.dispatchEvent(new CustomEvent('googleDriveUpdate')); // Notify components of update
