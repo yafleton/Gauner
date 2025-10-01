@@ -86,7 +86,7 @@ export class AzureTTSService {
         headers: {
           'Ocp-Apim-Subscription-Key': this.apiKey,
           'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': 'riff-24khz-16bit-mono-pcm',
+          'X-Microsoft-OutputFormat': 'audio-24khz-160kbitrate-mono-mp3',
         },
         body: ssml,
       });
@@ -206,8 +206,8 @@ export class AzureTTSService {
     return combinedBuffer.buffer;
   }
 
-  downloadAudio(audioBuffer: ArrayBuffer, filename: string = 'speech.wav'): void {
-    const blob = new Blob([audioBuffer], { type: 'audio/wav' });
+  downloadAudio(audioBuffer: ArrayBuffer, filename: string = 'speech.mp3'): void {
+    const blob = new Blob([audioBuffer], { type: 'audio/mp3' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
