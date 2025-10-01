@@ -175,22 +175,30 @@ class GoogleDriveStorageService {
     try {
       console.log('🔐 Starting Google Drive authentication...');
       
-      // Use the new Google Identity Services approach
-      const tokenClient = window.google.accounts.oauth2.initTokenClient({
-        client_id: this.CLIENT_ID,
-        scope: this.SCOPES,
-        callback: (response: any) => {
-          console.log('✅ Google Drive authentication successful');
-          // Store the access token for later use
-          localStorage.setItem('google_drive_access_token', response.access_token);
-        },
-        error_callback: (error: any) => {
-          console.error('❌ Google Drive authentication error:', error);
-        }
-      });
+      // Use the new Google Identity Services approach with Promise
+      return new Promise((resolve) => {
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+          client_id: this.CLIENT_ID,
+          scope: this.SCOPES,
+          callback: (response: any) => {
+            if (response.access_token) {
+              console.log('✅ Google Drive authentication successful');
+              // Store the access token for later use
+              localStorage.setItem('google_drive_access_token', response.access_token);
+              resolve(true);
+            } else {
+              console.error('❌ Authentication failed - no access token');
+              resolve(false);
+            }
+          },
+          error_callback: (error: any) => {
+            console.error('❌ Google Drive authentication error:', error);
+            resolve(false);
+          }
+        });
 
-      tokenClient.requestAccessToken();
-      return true;
+        tokenClient.requestAccessToken();
+      });
     } catch (error) {
       console.error('❌ Google Drive authentication error:', error);
       return false;
@@ -207,9 +215,30 @@ class GoogleDriveStorageService {
     try {
       // Check if we have a valid access token
       const token = localStorage.getItem('google_drive_access_token');
-      const isSignedIn = !!token;
-      console.log('🔐 Authentication status:', isSignedIn);
-      return isSignedIn;
+      if (!token) {
+        console.log('🔐 No access token found');
+        return false;
+      }
+
+      // Validate token by making a simple API call
+      const response = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        console.log('🔐 Authentication status: valid token');
+        return true;
+      } else if (response.status === 401) {
+        console.log('🔐 Authentication status: invalid/expired token');
+        // Clear invalid token
+        localStorage.removeItem('google_drive_access_token');
+        return false;
+      } else {
+        console.log('🔐 Authentication status: token validation failed');
+        return false;
+      }
     } catch (error) {
       console.error('❌ Authentication check error:', error);
       return false;
@@ -591,6 +620,12 @@ class GoogleDriveStorageService {
   }
 
   // localStorage methods removed - using Google Drive only for cross-device sync
+
+  // Clear invalid authentication and force re-authentication
+  clearAuthentication(): void {
+    localStorage.removeItem('google_drive_access_token');
+    console.log('🔐 Cleared invalid authentication token');
+  }
 
   // localStorage methods removed - using Google Drive only for cross-device sync
 

@@ -527,9 +527,14 @@ const AzureTTS: React.FC = () => {
                     <p className="text-yellow-200 text-xs mt-1">Connect to Google Drive to save and sync audio files across devices</p>
                     <button
                       onClick={async () => {
+                        console.log('🔄 Starting Google Drive authentication...');
                         const success = await googleDriveStorage.authenticate();
                         if (success) {
                           setGoogleDriveAuthStatus('authenticated');
+                          console.log('✅ Google Drive connected successfully');
+                        } else {
+                          setGoogleDriveAuthStatus('error');
+                          console.error('❌ Google Drive authentication failed');
                         }
                       }}
                       className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors font-medium"
@@ -541,13 +546,24 @@ const AzureTTS: React.FC = () => {
                 {googleDriveAuthStatus === 'error' && (
                   <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3">
                     <p className="text-red-300 text-sm font-medium">❌ Google Drive Connection Failed</p>
-                    <p className="text-red-200 text-xs mt-1">Please refresh the page and try connecting again</p>
-                    <button
-                      onClick={() => window.location.reload()}
-                      className="mt-3 w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors font-medium"
-                    >
-                      Refresh Page
-                    </button>
+                    <p className="text-red-200 text-xs mt-1">Authentication token may be expired. Clear and retry.</p>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => {
+                          googleDriveStorage.clearAuthentication();
+                          setGoogleDriveAuthStatus('not-authenticated');
+                        }}
+                        className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded transition-colors font-medium"
+                      >
+                        Clear & Retry
+                      </button>
+                      <button
+                        onClick={() => window.location.reload()}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors font-medium"
+                      >
+                        Refresh Page
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
