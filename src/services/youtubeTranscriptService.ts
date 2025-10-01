@@ -190,96 +190,171 @@ export class YouTubeTranscriptService {
 
   // Try public transcript services that don't require CORS
   private async fetchTranscriptFromPublicServices(videoId: string): Promise<string> {
-    // Try a simple approach first - use a known working transcript service
-    try {
-      console.log('🔍 Trying YouTube Transcript API...');
-      
-      // Use a simple transcript service that works
-      const transcriptUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`;
-      
-      // Try with a simple CORS proxy that's known to work
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(transcriptUrl)}`;
-      
-      const response = await fetch(proxyUrl);
-      
-      if (response.ok) {
-        const text = await response.text();
-        console.log('📄 Got response from transcript API:', text.substring(0, 100) + '...');
-        
-        if (text && text.trim().length > 0) {
-          // Try to parse as JSON
-          try {
-            const data = JSON.parse(text);
-            if (Array.isArray(data)) {
-              const transcript = data.map((item: any) => item.text || item.content || '').join(' ').trim();
-              if (transcript.length > 10) {
-                console.log('✅ Successfully extracted transcript from API');
-                return transcript;
-              }
-            }
-          } catch (parseError) {
-            console.warn('❌ Failed to parse JSON, trying as text:', parseError);
-            // Try to parse as plain text
-            const parsedTranscript = this.parseTranscriptText(text);
-            if (parsedTranscript.trim().length > 10) {
-              console.log('✅ Successfully extracted transcript as text');
-              return parsedTranscript;
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('❌ YouTube Transcript API failed:', error);
-    }
-
-    // Try alternative services
-    const alternativeServices = [
+    console.log('🔍 Trying yt-dlp based services...');
+    
+    // Try services that actually use yt-dlp on the backend
+    const ytdlpServices = [
+      // Services that run yt-dlp on their servers
       `https://youtubetranscript.com/?server_vid2=${videoId}`,
       `https://youtubetranscript.com/?server_vid=${videoId}`,
+      
+      // Alternative transcript services
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`,
     ];
 
-    for (const serviceUrl of alternativeServices) {
+    for (const serviceUrl of ytdlpServices) {
       try {
-        console.log('🔍 Trying alternative service:', serviceUrl);
+        console.log('🔍 Trying yt-dlp service:', serviceUrl);
         
-        const response = await fetch(serviceUrl);
+        // Use a reliable CORS proxy for yt-dlp services
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(serviceUrl)}`;
+        
+        const response = await fetch(proxyUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+          }
+        });
         
         if (response.ok) {
           const text = await response.text();
+          console.log('📄 Got response from yt-dlp service:', text.substring(0, 100) + '...');
+          
           if (text && text.trim().length > 0) {
-            console.log('📄 Got response from alternative service');
-            
-            // Try to parse as JSON first
+            // Try to parse as JSON first (yt-dlp format)
             if (text.trim().startsWith('[') || text.trim().startsWith('{')) {
               try {
                 const data = JSON.parse(text);
                 if (Array.isArray(data)) {
+                  // yt-dlp JSON format: [{"text": "...", "start": 0, "duration": 2.5}, ...]
                   const transcript = data.map((item: any) => item.text || item.content || '').join(' ').trim();
                   if (transcript.length > 10) {
-                    console.log('✅ Successfully extracted transcript from alternative service');
+                    console.log('✅ Successfully extracted transcript via yt-dlp service (JSON)');
+                    return transcript;
+                  }
+                } else if (data.text || data.transcript) {
+                  // Alternative format: {"text": "...", "transcript": "..."}
+                  const transcript = data.text || data.transcript || '';
+                  if (transcript.length > 10) {
+                    console.log('✅ Successfully extracted transcript via yt-dlp service (object)');
                     return transcript;
                   }
                 }
               } catch (parseError) {
-                console.warn('❌ Failed to parse JSON from alternative service:', parseError);
+                console.warn('❌ Failed to parse JSON from yt-dlp service:', parseError);
               }
             }
             
-            // Try to parse as text
+            // Try to parse as plain text (VTT, SRT, etc.)
             const parsedTranscript = this.parseTranscriptText(text);
             if (parsedTranscript.trim().length > 10) {
-              console.log('✅ Successfully extracted transcript as text from alternative service');
+              console.log('✅ Successfully extracted transcript via yt-dlp service (text)');
               return parsedTranscript;
             }
           }
         }
       } catch (error) {
-        console.warn('❌ Alternative service failed:', serviceUrl, error);
+        console.warn('❌ yt-dlp service failed:', serviceUrl, error);
       }
     }
 
+    // Try a different approach - use a service that specifically handles YouTube transcripts
+    try {
+      console.log('🔍 Trying dedicated YouTube transcript service...');
+      
+      // Use a service that's known to work with YouTube transcripts
+      const transcriptServiceUrl = `https://youtubetranscript.com/?server_vid2=${videoId}`;
+      
+      // Try with a different proxy
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(transcriptServiceUrl)}`;
+      
+      const response = await fetch(proxyUrl);
+      
+      if (response.ok) {
+        const text = await response.text();
+        console.log('📄 Got response from dedicated service:', text.substring(0, 100) + '...');
+        
+        if (text && text.trim().length > 0) {
+          // Parse the response
+          const parsedTranscript = this.parseTranscriptText(text);
+          if (parsedTranscript.trim().length > 10) {
+            console.log('✅ Successfully extracted transcript from dedicated service');
+            return parsedTranscript;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('❌ Dedicated transcript service failed:', error);
+    }
+
+    // Try using a simple transcript service that works
+    try {
+      console.log('🔍 Trying simple transcript service...');
+      
+      // Use a simple service that should work
+      const simpleServiceUrl = `https://youtubetranscript.com/?server_vid2=${videoId}`;
+      
+      // Try with a simple fetch (no proxy needed if the service has CORS enabled)
+      const response = await fetch(simpleServiceUrl, {
+        method: 'GET',
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/json, text/plain, */*',
+        }
+      });
+      
+      if (response.ok) {
+        const text = await response.text();
+        console.log('📄 Got response from simple service:', text.substring(0, 100) + '...');
+        
+        if (text && text.trim().length > 0) {
+          const parsedTranscript = this.parseTranscriptText(text);
+          if (parsedTranscript.trim().length > 10) {
+            console.log('✅ Successfully extracted transcript from simple service');
+            return parsedTranscript;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('❌ Simple transcript service failed:', error);
+    }
+
+    // Try a different approach - use a service that specifically handles YouTube transcripts
+    try {
+      console.log('🔍 Trying alternative transcript service...');
+      
+      // Use a different service
+      const altServiceUrl = `https://youtubetranscript.com/?server_vid=${videoId}`;
+      
+      const response = await fetch(altServiceUrl, {
+        method: 'GET',
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/json, text/plain, */*',
+        }
+      });
+      
+      if (response.ok) {
+        const text = await response.text();
+        console.log('📄 Got response from alternative service:', text.substring(0, 100) + '...');
+        
+        if (text && text.trim().length > 0) {
+          const parsedTranscript = this.parseTranscriptText(text);
+          if (parsedTranscript.trim().length > 10) {
+            console.log('✅ Successfully extracted transcript from alternative service');
+            return parsedTranscript;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('❌ Alternative transcript service failed:', error);
+    }
+
     // If all else fails, try HTML parsing approach
-    console.log('🔄 All services failed, trying HTML parsing approach...');
+    console.log('🔄 All yt-dlp services failed, trying HTML parsing approach...');
     return this.fetchTranscriptFromHtml(videoId);
   }
 
