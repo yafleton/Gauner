@@ -190,6 +190,32 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
     queueService.retryItem(id);
   };
 
+  const handleGenerateAudio = async (id: string) => {
+    try {
+      setError('');
+      await queueService.processItem(id);
+    } catch (error) {
+      console.error('Failed to generate audio:', error);
+      setError(`Failed to generate audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handlePlayAudio = (audioFile: any) => {
+    try {
+      const audioUrl = URL.createObjectURL(audioFile.blob);
+      const audio = new Audio(audioUrl);
+      audio.play();
+      
+      // Clean up the URL after playing
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+      };
+    } catch (error) {
+      console.error('Failed to play audio:', error);
+      setError(`Failed to play audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const handleClearCompleted = () => {
     queueService.clearCompleted();
   };
@@ -546,6 +572,16 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
                     </div>
 
                     <div className="flex space-x-2 ml-4">
+                      {item.status === 'pending' && (
+                        <button
+                          onClick={() => handleGenerateAudio(item.id)}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
+                          title="Generate Audio"
+                        >
+                          Generate
+                        </button>
+                      )}
+                      
                       {item.status === 'failed' && (
                         <button
                           onClick={() => handleRetryItem(item.id)}
@@ -553,6 +589,16 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
                           title="Retry"
                         >
                           <RefreshCw className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {item.status === 'completed' && item.audioFile && (
+                        <button
+                          onClick={() => handlePlayAudio(item.audioFile)}
+                          className="p-1 text-green-400 hover:text-green-300 transition-colors"
+                          title="Play Audio"
+                        >
+                          <Play className="w-4 h-4" />
                         </button>
                       )}
                       

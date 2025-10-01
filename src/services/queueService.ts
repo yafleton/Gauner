@@ -85,10 +85,7 @@ class QueueService {
     this.queue.push(queueItem);
     this.notifyQueueUpdate();
     
-    // Start processing if not already running
-    if (!this.isProcessing) {
-      this.startProcessing();
-    }
+    // Don't auto-process - let user manually trigger generation
 
     console.log('📥 Added item to queue:', id, title);
     return id;
@@ -108,6 +105,89 @@ class QueueService {
       completed: this.queue.filter(item => item.status === 'completed').length,
       failed: this.queue.filter(item => item.status === 'failed').length
     };
+  }
+
+  // Manually process a specific queue item
+  async processItem(itemId: string): Promise<void> {
+    const item = this.queue.find(q => q.id === itemId);
+    if (!item) {
+      throw new Error(`Queue item ${itemId} not found`);
+    }
+
+    if (item.status !== 'pending') {
+      throw new Error(`Queue item ${itemId} is not pending`);
+    }
+
+    if (!this.ttsService) {
+      throw new Error('TTS service not initialized');
+    }
+
+    try {
+      console.log('🎵 Starting manual processing for item:', itemId);
+      item.status = 'processing';
+      item.progress = 10;
+      this.notifyQueueUpdate();
+
+      // Generate audio
+      const audioArrayBuffer = await this.ttsService.synthesizeSpeech(
+        item.transcript,
+        item.voice,
+        this.getLanguageCode(item.language)
+      );
+
+      if (!audioArrayBuffer) {
+        throw new Error('Failed to generate audio');
+      }
+
+      const audioBlob = new Blob([audioArrayBuffer], { type: 'audio/wav' });
+
+      item.progress = 60;
+      this.notifyQueueUpdate();
+
+      // Create audio file object
+      const audioFile: AudioFile = {
+        id: item.id,
+        userId: item.userId || 'queue-user',
+        filename: `${item.title.replace(/[^a-zA-Z0-9]/g, '_')}.wav`,
+        blob: audioBlob,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        voice: item.voice,
+        text: item.transcript,
+        size: audioBlob.size
+      };
+
+      item.progress = 80;
+      this.notifyQueueUpdate();
+
+      // Save to Google Drive (optional - don't fail if Google Drive is not available)
+      try {
+        const saveResult = await googleDriveStorage.saveAudioFile(item.userId || 'queue-user', audioFile);
+        
+        if (!saveResult.success) {
+          console.warn('⚠️ Google Drive save failed, but continuing:', saveResult.error);
+        } else {
+          console.log('✅ Successfully saved to Google Drive');
+        }
+      } catch (error) {
+        console.warn('⚠️ Google Drive save failed, but continuing:', error);
+      }
+
+      item.progress = 100;
+      item.status = 'completed';
+      item.processedAt = new Date();
+      item.audioFile = audioFile;
+
+      console.log('✅ Manual processing completed for item:', itemId);
+      this.notifyQueueUpdate();
+
+    } catch (error) {
+      console.error('❌ Failed to manually process queue item:', itemId, error);
+      item.status = 'failed';
+      item.error = error instanceof Error ? error.message : 'Unknown error';
+      this.notifyQueueUpdate();
+      throw error;
+    }
   }
 
   // Remove item from queue
