@@ -37,17 +37,29 @@ const PWAInstallPrompt: React.FC = () => {
       setDeferredPrompt(null);
     };
 
+    // Show install prompt after a delay if not dismissed
+    const showInstallPromptTimer = setTimeout(() => {
+      if (!sessionStorage.getItem('pwa-install-dismissed') && !isInstalled) {
+        setShowInstallPrompt(true);
+      }
+    }, 3000); // Show after 3 seconds
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
+      clearTimeout(showInstallPromptTimer);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+      // If no deferred prompt, show instructions for manual install
+      alert('📱 To install this app:\n\n1. Tap the Share button in Safari\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" to confirm\n\nThis will install the app for better performance!');
+      return;
+    }
 
     try {
       await deferredPrompt.prompt();
