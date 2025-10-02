@@ -10,7 +10,11 @@ import {
 } from 'lucide-react';
 import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useSimpleAuth();
@@ -36,11 +40,24 @@ const Sidebar: React.FC = () => {
     <div className="w-64 bg-dark-sidebar h-screen flex flex-col border-r border-border-dark">
       {/* Logo */}
       <div className="p-6 border-b border-border-dark">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-accent-purple to-accent-blue rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-lg">G</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-accent-purple to-accent-blue rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-lg">G</span>
+            </div>
+            <span className="text-xl font-bold text-text-primary">Gauner</span>
           </div>
-          <span className="text-xl font-bold text-text-primary">Gauner</span>
+          {/* Mobile Close Button */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="lg:hidden p-2 text-text-secondary hover:text-text-primary"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -54,7 +71,10 @@ const Sidebar: React.FC = () => {
             return (
               <li key={item.id}>
                 <button
-                  onClick={() => navigate(item.path)}
+                  onClick={() => {
+                    navigate(item.path);
+                    onClose?.(); // Close mobile menu after navigation
+                  }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all duration-200 ${
                     isActive
                       ? 'bg-gradient-to-r from-accent-purple to-accent-blue text-white'

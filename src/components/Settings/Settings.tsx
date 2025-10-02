@@ -94,12 +94,12 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="flex items-center space-x-3 mb-8">
-          <SettingsIcon size={32} className="text-accent-purple" />
-          <h1 className="text-3xl font-bold text-text-primary">Settings</h1>
+        <div className="flex items-center space-x-3 mb-6 sm:mb-8">
+          <SettingsIcon size={28} className="text-accent-purple sm:w-8 sm:h-8" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-text-primary">Settings</h1>
         </div>
 
         {/* User Info */}
@@ -157,7 +157,7 @@ const Settings: React.FC = () => {
                       type={showKey ? 'text' : 'password'}
                       value={azureKey}
                       onChange={(e) => setAzureKey(e.target.value)}
-                      className="input pl-12 pr-12"
+                      className="input pl-12 pr-12 text-base min-h-[44px]"
                       placeholder="Enter your Azure TTS API key"
                     />
                     <button
@@ -180,7 +180,7 @@ const Settings: React.FC = () => {
                   <select
                     value={azureRegion}
                     onChange={(e) => setAzureRegion(e.target.value)}
-                    className="input"
+                    className="input text-base min-h-[44px]"
                   >
                     <option value="eastus">East US</option>
                     <option value="eastus2">East US 2</option>
@@ -247,7 +247,7 @@ const Settings: React.FC = () => {
                     type={showYoutubeKey ? 'text' : 'password'}
                     value={youtubeKey}
                     onChange={(e) => setYoutubeKey(e.target.value)}
-                    className="input pl-12 pr-12"
+                    className="input pl-12 pr-12 text-base min-h-[44px]"
                     placeholder="Enter your YouTube Data API key (optional)"
                   />
                   <button
@@ -296,11 +296,11 @@ const Settings: React.FC = () => {
             </div>
 
             {/* Save Button */}
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
               <button
                 onClick={handleSave}
                 disabled={isSaving || !azureKey.trim() || !azureRegion}
-                className="btn-primary px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary px-6 py-4 text-base disabled:opacity-50 disabled:cursor-not-allowed min-h-[56px]"
               >
                 {isSaving ? (
                   <div className="flex items-center space-x-2">

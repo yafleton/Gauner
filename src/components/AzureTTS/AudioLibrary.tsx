@@ -273,21 +273,21 @@ const AudioLibrary: React.FC = () => {
     <div className="card h-full flex flex-col">
       {/* Header */}
       <div className="mb-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 className="text-lg font-semibold text-text-primary">
             Audio Library
           </h2>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
             <button
               onClick={loadAudioFiles}
-              className="text-blue-400 hover:text-blue-300 text-sm px-3 py-1 border border-blue-400/30 rounded"
+              className="text-blue-400 hover:text-blue-300 text-sm px-3 py-2 border border-blue-400/30 rounded min-h-[44px]"
             >
               🔄 Refresh
             </button>
-            {audioFiles.length > 0 && (
+            {googleDriveFiles.length > 0 && (
               <button
                 onClick={handleDeleteAll}
-                className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                className="text-sm text-red-400 hover:text-red-300 transition-colors px-3 py-2 border border-red-400/30 rounded min-h-[44px]"
               >
                 Clear All
               </button>
@@ -315,10 +315,10 @@ const AudioLibrary: React.FC = () => {
       </div>
 
       {/* Stats */}
-      {audioFiles.length > 0 && (
+      {googleDriveFiles.length > 0 && (
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="bg-bg-secondary/30 rounded-lg p-3 text-center">
-            <div className="text-lg font-semibold text-text-primary">{stats.count}</div>
+            <div className="text-lg font-semibold text-text-primary">{stats.totalFiles}</div>
             <div className="text-xs text-text-secondary">Files</div>
           </div>
           <div className="bg-bg-secondary/30 rounded-lg p-3 text-center">
@@ -372,31 +372,31 @@ const AudioLibrary: React.FC = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-2">
                     <button
                       onClick={() => handlePlayPause(file)}
-                      className="w-6 h-6 bg-green-600/20 rounded-full flex items-center justify-center hover:bg-green-600/30 transition-colors"
+                      className="w-8 h-8 bg-green-600/20 rounded-full flex items-center justify-center hover:bg-green-600/30 transition-colors min-h-[44px]"
                       title="Play/Pause"
                     >
                       {playingId === file.id ? (
-                        <Pause size={10} className="text-green-400" />
+                        <Pause size={12} className="text-green-400" />
                       ) : (
-                        <Play size={10} className="text-green-400 ml-0.5" />
+                        <Play size={12} className="text-green-400 ml-0.5" />
                       )}
                     </button>
                     <button
                       onClick={() => window.open(file.driveUrl, '_blank')}
-                      className="p-1 text-text-secondary hover:text-green-400 transition-colors"
+                      className="p-2 text-text-secondary hover:text-green-400 transition-colors min-h-[44px]"
                       title="Open in Google Drive"
                     >
-                      <Cloud size={14} />
+                      <Cloud size={16} />
                     </button>
                     <button
                       onClick={() => handleGoogleDriveDelete(file.driveFileId)}
-                      className="p-1 text-text-secondary hover:text-red-400 transition-colors"
+                      className="p-2 text-text-secondary hover:text-red-400 transition-colors min-h-[44px]"
                       title="Delete"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>

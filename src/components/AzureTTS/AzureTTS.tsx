@@ -25,6 +25,7 @@ const AzureTTS: React.FC = () => {
   const [isCleaning, setIsCleaning] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [retryInfo, setRetryInfo] = useState<{attempt: number, maxAttempts: number} | null>(null);
 
   // audioStorage removed - using Google Drive only
   const googleDriveStorage = useMemo(() => GoogleDriveStorageService.getInstance(), []);
@@ -42,7 +43,15 @@ const AzureTTS: React.FC = () => {
     });
     
     // Always create service, even without API key (for voices)
-    return new AzureTTSService(currentApiKey || 'demo-key', currentRegion);
+    const service = new AzureTTSService(currentApiKey || 'demo-key', currentRegion);
+    
+    // Set up retry callback
+    service.setRetryCallback((attempt, maxAttempts) => {
+      console.log(`🔄 Retry callback: ${attempt}/${maxAttempts}`);
+      setRetryInfo({ attempt, maxAttempts });
+    });
+    
+    return service;
   }, [user?.id, user?.azureApiKey, user?.azureRegion]);
 
 
@@ -474,15 +483,24 @@ const AzureTTS: React.FC = () => {
 
     } catch (error) {
       // Better error handling for different types of errors
+      console.error('🔍 React component error handling:', {
+        errorType: typeof error,
+        errorName: error instanceof Error ? error.name : 'Unknown',
+        errorMessage: error instanceof Error ? error.message : String(error),
+        fullError: error
+      });
+
       if (error instanceof Error) {
         if (error.message.includes('API key not configured')) {
           setError('Azure TTS API key not configured. Please set up your API key in Settings.');
-        } else if (error.message.includes('AbortError') || error.message.includes('fetch')) {
-          setError('Network connection interrupted. This can happen when switching tabs on mobile. Please try again.');
+        } else if (error.message.includes('AbortError') || error.message.includes('fetch') || error.message.includes('network')) {
+          setError('Network connection interrupted. This can happen when switching tabs on mobile. The system will retry automatically, but if this persists, please try again.');
         } else if (error.message.includes('TTS synthesis failed')) {
-          setError('Azure TTS service error. Please check your API key and try again.');
+          setError('Azure TTS service error. Please check your API key and region settings in Settings.');
+        } else if (error.message.includes('Failed to fetch') || error.message.includes('Load failed')) {
+          setError('Network error detected. This might be due to switching tabs on mobile. Please try again.');
         } else {
-          setError('Failed to synthesize speech. Please try again.');
+          setError(`Audio generation failed: ${error.message}. Please try again.`);
         }
       } else {
         setError('Failed to synthesize speech. Please try again.');
@@ -491,6 +509,7 @@ const AzureTTS: React.FC = () => {
     } finally {
       setIsLoading(false);
       setProgress({ current: 0, total: 0 });
+      setRetryInfo(null); // Clear retry info when done
     }
   };
 
@@ -593,7 +612,7 @@ const AzureTTS: React.FC = () => {
 
         {/* Tab Content */}
         {activeTab === 'generate' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8 items-stretch">
             {/* Input Section */}
             <div className="lg:col-span-2">
               <div className="card h-full">
@@ -606,18 +625,18 @@ const AzureTTS: React.FC = () => {
                   <label className="block text-sm font-medium text-text-primary">
                     Enter your text (up to 30,000+ characters)
                   </label>
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-2">
                     {/* Cleanup Button */}
                     <button
                       onClick={handleCleanupTranscript}
                       disabled={isCleaning || !text.trim()}
-                      className="flex items-center space-x-1 px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors"
+                      className="flex items-center space-x-1 px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors min-h-[44px]"
                       title="Clean VTT transcript (remove timestamps, tags, duplicates)"
                     >
                       {isCleaning ? (
-                        <Loader className="animate-spin" size={12} />
+                        <Loader className="animate-spin" size={14} />
                       ) : (
-                        <Scissors size={12} />
+                        <Scissors size={14} />
                       )}
                       <span>{isCleaning ? 'Cleaning...' : 'Clean'}</span>
                     </button>
@@ -626,13 +645,13 @@ const AzureTTS: React.FC = () => {
                     <button
                       onClick={handleTranslateTranscript}
                       disabled={isTranslating || !text.trim()}
-                      className="flex items-center space-x-1 px-3 py-1 text-xs bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors"
+                      className="flex items-center space-x-1 px-3 py-2 text-sm bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors min-h-[44px]"
                       title="Translate text to selected language"
                     >
                       {isTranslating ? (
-                        <Loader className="animate-spin" size={12} />
+                        <Loader className="animate-spin" size={14} />
                       ) : (
-                        <Languages size={12} />
+                        <Languages size={14} />
                       )}
                       <span>{isTranslating ? 'Translating...' : 'Translate'}</span>
                     </button>
@@ -641,15 +660,15 @@ const AzureTTS: React.FC = () => {
                     <button
                       onClick={handleCleanAndTranslate}
                       disabled={isCleaning || isTranslating || !text.trim()}
-                      className="flex items-center space-x-1 px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors"
+                      className="flex items-center space-x-1 px-3 py-2 text-sm bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors min-h-[44px]"
                       title="Clean and translate in one operation"
                     >
                       {(isCleaning || isTranslating) ? (
-                        <Loader className="animate-spin" size={12} />
+                        <Loader className="animate-spin" size={14} />
                       ) : (
                         <>
-                          <Scissors size={12} />
-                          <Languages size={12} />
+                          <Scissors size={14} />
+                          <Languages size={14} />
                         </>
                       )}
                       <span>
@@ -664,7 +683,7 @@ const AzureTTS: React.FC = () => {
                     setText(e.target.value);
                     if (error) setError(''); // Clear error when user starts typing
                   }}
-                  className="input min-h-[300px] resize-none"
+                  className="input min-h-[200px] sm:min-h-[300px] resize-none text-base"
                   placeholder="Enter the text you want to convert to speech, or paste a VTT transcript to clean up..."
                   maxLength={1000000}
                 />
@@ -681,7 +700,7 @@ const AzureTTS: React.FC = () => {
               </div>
 
               {/* Voice Selection */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 <div>
                   <label className="block text-sm font-medium text-text-primary mb-2">
                     Language
@@ -689,7 +708,7 @@ const AzureTTS: React.FC = () => {
                   <select
                     value={selectedLanguage}
                     onChange={(e) => setSelectedLanguage(e.target.value)}
-                    className="input"
+                    className="input text-base min-h-[44px]"
                     disabled={isLoading}
                   >
                     {getAvailableLanguages().map(lang => (
@@ -707,7 +726,7 @@ const AzureTTS: React.FC = () => {
                   <select
                     value={selectedVoice}
                     onChange={(e) => setSelectedVoice(e.target.value)}
-                    className="input"
+                    className="input text-base min-h-[44px]"
                     disabled={isLoading || getLanguageVoices().length === 0}
                   >
                     {getLanguageVoices().map(voice => (
@@ -728,7 +747,7 @@ const AzureTTS: React.FC = () => {
                   type="text"
                   value={customFilename}
                   onChange={(e) => setCustomFilename(e.target.value)}
-                  className="input"
+                  className="input text-base min-h-[44px]"
                   placeholder="Enter custom filename (without .mp3 extension)"
                   disabled={isLoading}
                   maxLength={50}
@@ -755,7 +774,7 @@ const AzureTTS: React.FC = () => {
                   }
                 }}
                 disabled={buttonDisabled}
-                className="w-full btn-primary py-3 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full btn-primary py-4 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed min-h-[56px]"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center space-x-2">
@@ -795,6 +814,23 @@ const AzureTTS: React.FC = () => {
                       <p className="text-orange-300 font-medium">Audio Generation Paused</p>
                       <p className="text-orange-200 text-sm">
                         📱 Switch back to this tab to continue generation
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Retry Information */}
+              {retryInfo && (
+                <div className="mt-4 bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="animate-spin">
+                      <div className="w-4 h-4 bg-blue-400 rounded-full"></div>
+                    </div>
+                    <div>
+                      <p className="text-blue-300 font-medium">Retrying Connection</p>
+                      <p className="text-blue-200 text-sm">
+                        🔄 Attempt {retryInfo.attempt} of {retryInfo.maxAttempts} - This happens when switching tabs on mobile
                       </p>
                     </div>
                   </div>
@@ -916,7 +952,7 @@ const AzureTTS: React.FC = () => {
           </div>
 
           {/* Audio Library Section */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 order-first lg:order-last">
             <div className="h-full">
               <AudioLibrary />
             </div>

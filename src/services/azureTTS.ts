@@ -10,12 +10,18 @@ const getAzureEndpoints = (region: string) => ({
 export class AzureTTSService {
   private apiKey: string;
   private region: string;
+  private retryCallback?: (attempt: number, maxAttempts: number) => void;
   private cache: CacheService;
 
   constructor(apiKey: string, region: string = 'eastus') {
     this.apiKey = apiKey;
     this.region = region;
     this.cache = CacheService.getInstance();
+  }
+
+  // Set callback for retry notifications
+  setRetryCallback(callback: (attempt: number, maxAttempts: number) => void) {
+    this.retryCallback = callback;
   }
 
   async getAvailableVoices(): Promise<AzureVoice[]> {
@@ -125,30 +131,68 @@ export class AzureTTSService {
 
       return audioBuffer;
     } catch (error) {
+      console.error('🔍 Detailed error analysis:', {
+        errorName: error instanceof Error ? error.name : 'Unknown',
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorType: typeof error,
+        retryCount,
+        isAbortError: error instanceof Error && error.name === 'AbortError',
+        isTypeError: error instanceof TypeError,
+        isNetworkError: error instanceof TypeError && (
+          error.message.includes('fetch') || 
+          error.message.includes('network') ||
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('Load failed')
+        ),
+        fullError: error
+      });
+
       // Check if this is an AbortError (timeout or tab switch)
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('🔄 Request was aborted (timeout or tab switch), retrying...');
         
-        // Retry up to 2 times for aborted requests
-        if (retryCount < 2) {
-          console.log(`🔄 Retry attempt ${retryCount + 1}/2`);
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        // Retry up to 3 times for aborted requests
+        if (retryCount < 3) {
+          console.log(`🔄 Retry attempt ${retryCount + 1}/3 for AbortError`);
+          if (this.retryCallback) {
+            this.retryCallback(retryCount + 1, 3);
+          }
+          await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1))); // Progressive delay
           return this.synthesizeSpeech(text, voice, language, retryCount + 1);
         }
       }
       
       // Check if this is a network error that might be due to tab switching
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && (
+        error.message.includes('fetch') || 
+        error.message.includes('network') ||
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('Load failed')
+      )) {
         console.log('🔄 Network error detected (possibly due to tab switch), retrying...');
         
-        if (retryCount < 2) {
-          console.log(`🔄 Retry attempt ${retryCount + 1}/2`);
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        if (retryCount < 3) {
+          console.log(`🔄 Retry attempt ${retryCount + 1}/3 for network error`);
+          if (this.retryCallback) {
+            this.retryCallback(retryCount + 1, 3);
+          }
+          await new Promise(resolve => setTimeout(resolve, 3000 * (retryCount + 1))); // Progressive delay
           return this.synthesizeSpeech(text, voice, language, retryCount + 1);
         }
       }
 
-      console.error('Error synthesizing speech:', error);
+      // Check for any generic error that might be due to tab switching
+      if (retryCount < 2) {
+        console.log('🔄 Generic error detected, attempting retry...');
+        console.log(`🔄 Retry attempt ${retryCount + 1}/2 for generic error`);
+        if (this.retryCallback) {
+          this.retryCallback(retryCount + 1, 2);
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return this.synthesizeSpeech(text, voice, language, retryCount + 1);
+      }
+
+      console.error('❌ All retry attempts exhausted. Final error:', error);
       throw error;
     }
   }
