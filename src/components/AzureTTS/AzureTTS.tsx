@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Mic, Loader, Save, Cloud, Scissors, Languages } from 'lucide-react';
+import { Mic, Loader, Save, Cloud } from 'lucide-react';
 import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
 import { AzureTTSService } from '../../services/azureTTS';
 import GoogleDriveStorageService from '../../services/googleDriveStorage';
 import { AzureVoice } from '../../types';
 import AudioLibrary from './AudioLibrary';
 import { v4 as uuidv4 } from 'uuid';
-import { transcriptCleanupService } from '../../services/transcriptCleanupService';
 
 const AzureTTS: React.FC = () => {
   const { user } = useSimpleAuth();
@@ -22,8 +21,6 @@ const AzureTTS: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'generate' | 'library'>('generate');
   const [isGoogleDriveReady, setIsGoogleDriveReady] = useState(false);
   const [googleDriveAuthStatus, setGoogleDriveAuthStatus] = useState<'checking' | 'authenticated' | 'not-authenticated' | 'error'>('checking');
-  const [isCleaning, setIsCleaning] = useState(false);
-  const [isTranslating, setIsTranslating] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [retryInfo, setRetryInfo] = useState<{attempt: number, maxAttempts: number} | null>(null);
 
@@ -108,94 +105,6 @@ const AzureTTS: React.FC = () => {
     };
   }, [isLoading, isPaused]);
 
-  // Handle transcript cleanup
-  const handleCleanupTranscript = async () => {
-    if (!text.trim()) {
-      setError('Please enter some text to clean up.');
-      return;
-    }
-
-    try {
-      setIsCleaning(true);
-      setError('');
-
-      const cleanedText = transcriptCleanupService.cleanTranscript(text);
-      setText(cleanedText);
-      
-      console.log('✅ Transcript cleaned successfully');
-    } catch (error) {
-      console.error('❌ Failed to clean transcript:', error);
-      setError('Failed to clean transcript. Please try again.');
-    } finally {
-      setIsCleaning(false);
-    }
-  };
-
-  // Handle translation
-  const handleTranslateTranscript = async () => {
-    if (!text.trim()) {
-      setError('Please enter some text to translate.');
-      return;
-    }
-
-    const targetLanguage = transcriptCleanupService.getLanguageName(selectedLanguage);
-    
-    try {
-      setIsTranslating(true);
-      setError('');
-
-      const translatedText = await transcriptCleanupService.translateText({
-        targetLanguage,
-        sourceText: text
-      });
-      
-      setText(translatedText);
-      console.log('✅ Transcript translated successfully');
-    } catch (error) {
-      console.error('❌ Failed to translate transcript:', error);
-      setError('Failed to translate transcript. Please try again.');
-    } finally {
-      setIsTranslating(false);
-    }
-  };
-
-  // Handle cleanup and translation combined
-  const handleCleanAndTranslate = useCallback(async () => {
-    if (!text.trim()) {
-      setError('Please enter some text to clean and translate.');
-      return;
-    }
-
-    const targetLanguage = transcriptCleanupService.getLanguageName(selectedLanguage);
-    
-    try {
-      setIsCleaning(true);
-      setIsTranslating(true);
-      setError('');
-
-      const result = await transcriptCleanupService.cleanAndTranslate(text, targetLanguage);
-      setText(result);
-      
-      console.log('✅ Transcript cleaned and translated successfully');
-    } catch (error) {
-      console.error('❌ Failed to clean and translate transcript:', error);
-      setError('Failed to clean and translate transcript. Please try again.');
-    } finally {
-      setIsCleaning(false);
-      setIsTranslating(false);
-    }
-  }, [text, selectedLanguage]);
-
-  // Auto-clean and translate when German is selected
-  useEffect(() => {
-    if (selectedLanguage.toLowerCase() === 'german' && text.trim()) {
-      const isVTT = transcriptCleanupService.isVTTTranscript(text);
-      if (isVTT) {
-        console.log('🇩🇪 German selected with VTT transcript - auto cleaning and translating...');
-        handleCleanAndTranslate();
-      }
-    }
-  }, [selectedLanguage, text, handleCleanAndTranslate]);
 
   // Check Google Drive status
   useEffect(() => {
@@ -621,62 +530,9 @@ const AzureTTS: React.FC = () => {
               </h2>
               
               <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-text-primary">
-                    Enter your text (up to 30,000+ characters)
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {/* Cleanup Button */}
-                    <button
-                      onClick={handleCleanupTranscript}
-                      disabled={isCleaning || !text.trim()}
-                      className="flex items-center space-x-1 px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors min-h-[44px]"
-                      title="Clean VTT transcript (remove timestamps, tags, duplicates)"
-                    >
-                      {isCleaning ? (
-                        <Loader className="animate-spin" size={14} />
-                      ) : (
-                        <Scissors size={14} />
-                      )}
-                      <span>{isCleaning ? 'Cleaning...' : 'Clean'}</span>
-                    </button>
-                    
-                    {/* Translate Button */}
-                    <button
-                      onClick={handleTranslateTranscript}
-                      disabled={isTranslating || !text.trim()}
-                      className="flex items-center space-x-1 px-3 py-2 text-sm bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors min-h-[44px]"
-                      title="Translate text to selected language"
-                    >
-                      {isTranslating ? (
-                        <Loader className="animate-spin" size={14} />
-                      ) : (
-                        <Languages size={14} />
-                      )}
-                      <span>{isTranslating ? 'Translating...' : 'Translate'}</span>
-                    </button>
-                    
-                    {/* Clean & Translate Button */}
-                    <button
-                      onClick={handleCleanAndTranslate}
-                      disabled={isCleaning || isTranslating || !text.trim()}
-                      className="flex items-center space-x-1 px-3 py-2 text-sm bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors min-h-[44px]"
-                      title="Clean and translate in one operation"
-                    >
-                      {(isCleaning || isTranslating) ? (
-                        <Loader className="animate-spin" size={14} />
-                      ) : (
-                        <>
-                          <Scissors size={14} />
-                          <Languages size={14} />
-                        </>
-                      )}
-                      <span>
-                        {(isCleaning || isTranslating) ? 'Processing...' : 'Clean & Translate'}
-                      </span>
-                    </button>
-                  </div>
-                </div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Enter your text (up to 30,000+ characters)
+                </label>
                 <textarea
                   value={text}
                   onChange={(e) => {
@@ -684,15 +540,10 @@ const AzureTTS: React.FC = () => {
                     if (error) setError(''); // Clear error when user starts typing
                   }}
                   className="input min-h-[200px] sm:min-h-[300px] resize-none text-base"
-                  placeholder="Enter the text you want to convert to speech, or paste a VTT transcript to clean up..."
+                  placeholder="Enter the text you want to convert to speech..."
                   maxLength={1000000}
                 />
-                <div className="flex justify-between items-center text-sm text-text-secondary mt-2">
-                  <div>
-                    {text.trim() && transcriptCleanupService.isVTTTranscript(text) && (
-                      <span className="text-blue-400">📝 VTT transcript detected</span>
-                    )}
-                  </div>
+                <div className="flex justify-end items-center text-sm text-text-secondary mt-2">
                   <div>
                     {text.length.toLocaleString()} characters
                   </div>
