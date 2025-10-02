@@ -7,7 +7,6 @@ import {
   Settings,
   LogOut,
   User,
-  Download
 } from 'lucide-react';
 import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
 
@@ -20,15 +19,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   const location = useLocation();
   const { user, logout } = useSimpleAuth();
 
-  const handleInstallClick = () => {
-    // Check if PWA can be installed
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-      // Show manual install instructions
-      alert('📱 To install this app:\n\n1. Tap the Share button in Safari (iOS)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" to confirm\n\nFor Chrome/Android:\n1. Tap the menu (⋮) button\n2. Tap "Add to Home Screen"\n3. Tap "Add" to confirm\n\nThis will install the app for better performance!');
-    } else {
-      alert('PWA installation not supported in this browser.');
-    }
-  };
 
   const menuItems = [
     { id: 'home', label: 'Home', icon: Home, path: '/' },
@@ -40,7 +30,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
       </svg>
     ), path: '/youtube' },
     { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
-    { id: 'install', label: 'Install App', icon: Download, path: null, action: handleInstallClick },
   ];
 
   const handleLogout = () => {
@@ -84,13 +73,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
               <li key={item.id}>
                 <button
                   onClick={() => {
-                    if (item.action) {
-                      item.action();
-                      onClose?.(); // Close mobile menu after action
-                    } else if (item.path) {
-                      navigate(item.path);
-                      onClose?.(); // Close mobile menu after navigation
-                    }
+                    navigate(item.path);
+                    onClose?.(); // Close mobile menu after navigation
                   }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all duration-200 ${
                     isActive
