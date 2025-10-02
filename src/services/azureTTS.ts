@@ -82,7 +82,7 @@ export class AzureTTSService {
       });
 
       const endpoints = getAzureEndpoints(this.region);
-      const response = await fetch(endpoints.tts, {
+      const response = await fetch(`${endpoints.tts}?format=audio-24khz-160kbitrate-mono-mp3`, {
         method: 'POST',
         headers: {
           'Ocp-Apim-Subscription-Key': this.apiKey,
@@ -106,13 +106,55 @@ export class AzureTTSService {
 
       const audioBuffer = await response.arrayBuffer();
       const firstBytes = new Uint8Array(audioBuffer.slice(0, 16));
+      // Parse MP3 frame header (first valid frame) to read actual bitrate/sample rate
+      const parseMp3Header = (bytes: Uint8Array) => {
+        if (bytes.length < 4) return null;
+        const b0 = bytes[0];
+        const b1 = bytes[1];
+        const b2 = bytes[2];
+        const b3 = bytes[3];
+        // Frame sync 11 bits: 0xFFE
+        if (b0 !== 0xFF || (b1 & 0xE0) !== 0xE0) return null;
+        const versionID = (b1 >> 3) & 0x03; // 00: MPEG2.5, 10: MPEG2, 11: MPEG1
+        const layer = (b1 >> 1) & 0x03; // 01: Layer III
+        const bitrateIndex = (b2 >> 4) & 0x0F;
+        const sampleRateIndex = (b2 >> 2) & 0x03;
+        const channelMode = (b3 >> 6) & 0x03;
+        // Determine version
+        const versionMap: { [key: number]: 'MPEG1' | 'MPEG2' | 'MPEG2.5' | 'reserved' } = {
+          0b11: 'MPEG1',
+          0b10: 'MPEG2',
+          0b00: 'MPEG2.5',
+          0b01: 'reserved'
+        };
+        const version = versionMap[versionID] || 'reserved';
+        if (layer !== 0b01) return null; // Expect Layer III
+        // Sample rates
+        const sampleRatesByVersion: { [key: string]: number[] } = {
+          'MPEG1': [44100, 48000, 32000],
+          'MPEG2': [22050, 24000, 16000],
+          'MPEG2.5': [11025, 12000, 8000]
+        };
+        const sampleRates = sampleRatesByVersion[version];
+        if (!sampleRates) return null;
+        const sampleRateHz = sampleRateIndex < 3 ? sampleRates[sampleRateIndex] : 0;
+        // Bitrate tables (kbps)
+        const brMpeg1L3 = [0,32,40,48,56,64,80,96,112,128,160,192,224,256,320];
+        const brMpeg2L3 = [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160];
+        const bitrateTable = version === 'MPEG1' ? brMpeg1L3 : brMpeg2L3;
+        const bitrateKbps = bitrateIndex > 0 && bitrateIndex < 15 ? bitrateTable[bitrateIndex] : 0;
+        const channels = channelMode === 0b11 ? 'mono' : 'stereo/joint';
+        return { version, bitrateKbps, sampleRateHz, channels };
+      };
+      const parsedHeader = parseMp3Header(firstBytes);
       console.log('🔍 Azure TTS Response:', {
         status: response.status,
         contentType: response.headers.get('content-type'),
         contentLength: response.headers.get('content-length'),
         audioBufferSize: audioBuffer.byteLength,
         firstBytes: Array.from(firstBytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '),
-        isValidMP3: firstBytes[0] === 0xFF && (firstBytes[1] & 0xE0) === 0xE0
+        isValidMP3: firstBytes[0] === 0xFF && (firstBytes[1] & 0xE0) === 0xE0,
+        parsedHeader
       });
 
       return audioBuffer;
