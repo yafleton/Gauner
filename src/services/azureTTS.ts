@@ -60,7 +60,7 @@ export class AzureTTSService {
     }
   }
 
-  async synthesizeSpeech(text: string, voice: string, language: string): Promise<ArrayBuffer> {
+  async synthesizeSpeech(text: string, voice: string, language: string, retryCount: number = 0): Promise<ArrayBuffer> {
     // If no valid API key, throw error
     if (!this.apiKey || this.apiKey === 'demo-key') {
       throw new Error('Azure TTS API key not configured. Please set up your Azure TTS API key.');
@@ -82,6 +82,11 @@ export class AzureTTSService {
       });
 
       const endpoints = getAzureEndpoints(this.region);
+      
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch(endpoints.tts, {
         method: 'POST',
         headers: {
@@ -90,7 +95,10 @@ export class AzureTTSService {
           'X-Microsoft-OutputFormat': 'audio-24khz-160kbitrate-mono-mp3',
         },
         body: ssml,
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -117,6 +125,29 @@ export class AzureTTSService {
 
       return audioBuffer;
     } catch (error) {
+      // Check if this is an AbortError (timeout or tab switch)
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('🔄 Request was aborted (timeout or tab switch), retrying...');
+        
+        // Retry up to 2 times for aborted requests
+        if (retryCount < 2) {
+          console.log(`🔄 Retry attempt ${retryCount + 1}/2`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+          return this.synthesizeSpeech(text, voice, language, retryCount + 1);
+        }
+      }
+      
+      // Check if this is a network error that might be due to tab switching
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.log('🔄 Network error detected (possibly due to tab switch), retrying...');
+        
+        if (retryCount < 2) {
+          console.log(`🔄 Retry attempt ${retryCount + 1}/2`);
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+          return this.synthesizeSpeech(text, voice, language, retryCount + 1);
+        }
+      }
+
       console.error('Error synthesizing speech:', error);
       throw error;
     }

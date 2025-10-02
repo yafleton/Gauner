@@ -473,7 +473,20 @@ const AzureTTS: React.FC = () => {
       }
 
     } catch (error) {
-      setError('Failed to synthesize speech. Please check your API key and try again.');
+      // Better error handling for different types of errors
+      if (error instanceof Error) {
+        if (error.message.includes('API key not configured')) {
+          setError('Azure TTS API key not configured. Please set up your API key in Settings.');
+        } else if (error.message.includes('AbortError') || error.message.includes('fetch')) {
+          setError('Network connection interrupted. This can happen when switching tabs on mobile. Please try again.');
+        } else if (error.message.includes('TTS synthesis failed')) {
+          setError('Azure TTS service error. Please check your API key and try again.');
+        } else {
+          setError('Failed to synthesize speech. Please try again.');
+        }
+      } else {
+        setError('Failed to synthesize speech. Please try again.');
+      }
       console.error('Error synthesizing speech:', error);
     } finally {
       setIsLoading(false);
