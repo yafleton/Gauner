@@ -6,6 +6,8 @@ import GoogleDriveStorageService from '../../services/googleDriveStorage';
 import { AzureVoice } from '../../types';
 import AudioLibrary from './AudioLibrary';
 import { v4 as uuidv4 } from 'uuid';
+import PWAService from '../../services/pwaService';
+import PWAInstallPrompt from '../PWAInstallPrompt';
 
 const AzureTTS: React.FC = () => {
   const { user } = useSimpleAuth();
@@ -23,6 +25,7 @@ const AzureTTS: React.FC = () => {
   const [googleDriveAuthStatus, setGoogleDriveAuthStatus] = useState<'checking' | 'authenticated' | 'not-authenticated' | 'error'>('checking');
   const [isPaused, setIsPaused] = useState(false);
   const [retryInfo, setRetryInfo] = useState<{attempt: number, maxAttempts: number} | null>(null);
+  const [pwaService] = useState(() => PWAService.getInstance());
 
   // audioStorage removed - using Google Drive only
   const googleDriveStorage = useMemo(() => GoogleDriveStorageService.getInstance(), []);
@@ -105,6 +108,30 @@ const AzureTTS: React.FC = () => {
     };
   }, [isLoading, isPaused]);
 
+  // Initialize PWA
+  useEffect(() => {
+    const initializePWA = async () => {
+      try {
+        console.log('🔧 Initializing PWA...');
+        const success = await pwaService.initialize();
+        if (success) {
+          console.log('✅ PWA initialized successfully');
+          
+          // Request notification permission
+          const notificationPermission = await pwaService.requestNotificationPermission();
+          if (notificationPermission) {
+            console.log('✅ Notification permission granted');
+          }
+        } else {
+          console.log('❌ PWA initialization failed');
+        }
+      } catch (error) {
+        console.error('❌ PWA initialization error:', error);
+      }
+    };
+
+    initializePWA();
+  }, [pwaService]);
 
   // Check Google Drive status
   useEffect(() => {
@@ -287,9 +314,12 @@ const AzureTTS: React.FC = () => {
         text,
         selectedVoice,
         languageCode,
-        (current, total) => {
+        async (current, total) => {
           console.log(`📊 Progress: ${current}/${total}`);
           setProgress({ current, total });
+          
+          // Send PWA progress notification
+          await pwaService.notifyAudioGenerationProgress(current, total);
         }
       );
 
@@ -371,6 +401,9 @@ const AzureTTS: React.FC = () => {
               console.log('✅ Audio file saved to Google Drive via backend');
               setShowSaveSuccess(true);
               setTimeout(() => setShowSaveSuccess(false), 3000);
+              
+              // Send PWA notification
+              await pwaService.notifyAudioGenerationComplete(generatedFilename);
             } else {
               throw new Error(uploadResult.error || 'Backend upload failed');
             }
@@ -379,6 +412,9 @@ const AzureTTS: React.FC = () => {
             console.warn('⚠️ Google Drive save failed, but audio was generated successfully');
             setShowSaveSuccess(true); // Show success because audio was generated
             setTimeout(() => setShowSaveSuccess(false), 3000);
+            
+            // Send PWA notification even if Google Drive failed
+            await pwaService.notifyAudioGenerationComplete(generatedFilename);
             // Don't return - continue to show success
           }
         } else {
@@ -414,6 +450,9 @@ const AzureTTS: React.FC = () => {
       } else {
         setError('Failed to synthesize speech. Please try again.');
       }
+      
+      // Send PWA error notification
+      await pwaService.notifyAudioGenerationError(error instanceof Error ? error.message : 'Unknown error');
       console.error('Error synthesizing speech:', error);
     } finally {
       setIsLoading(false);
@@ -818,6 +857,9 @@ const AzureTTS: React.FC = () => {
           </div>
         )}
       </div>
+      
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
     </div>
   );
 };
