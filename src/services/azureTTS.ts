@@ -148,26 +148,64 @@ export class AzureTTSService {
     console.log(`📝 Long text detected, splitting into ${chunks.length} chunks`);
     const audioChunks: ArrayBuffer[] = [];
 
-    for (let i = 0; i < chunks.length; i++) {
-      try {
-        const audioChunk = await this.synthesizeSpeech(chunks[i], voice, language);
-        audioChunks.push(audioChunk);
+    // Add mobile browser background processing detection
+    let isPageVisible = true;
+    const handleVisibilityChange = () => {
+      isPageVisible = !document.hidden;
+      console.log(`📱 Page visibility changed: ${isPageVisible ? 'visible' : 'hidden'}`);
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        if (onProgress) {
-          onProgress(i + 1, chunks.length);
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        // Check if page is still visible before processing each chunk
+        if (!isPageVisible) {
+          console.log('⏸️ Page is hidden, pausing audio generation...');
+          
+          // Wait for page to become visible again
+          await new Promise<void>((resolve) => {
+            const checkVisibility = () => {
+              if (!document.hidden) {
+                console.log('▶️ Page is visible again, resuming audio generation...');
+                document.removeEventListener('visibilitychange', checkVisibility);
+                resolve();
+              }
+            };
+            document.addEventListener('visibilitychange', checkVisibility);
+            
+            // Also check immediately in case it's already visible
+            if (!document.hidden) {
+              document.removeEventListener('visibilitychange', checkVisibility);
+              resolve();
+            }
+          });
         }
 
-        // Small delay between chunks to avoid rate limiting
-        if (i < chunks.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+        try {
+          console.log(`🔊 Processing chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)`);
+          const audioChunk = await this.synthesizeSpeech(chunks[i], voice, language);
+          audioChunks.push(audioChunk);
+
+          if (onProgress) {
+            onProgress(i + 1, chunks.length);
+          }
+
+          // Small delay between chunks to avoid rate limiting
+          if (i < chunks.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } catch (error) {
+          console.error(`❌ Error processing chunk ${i + 1}:`, error);
+          throw error;
         }
-      } catch (error) {
-        console.error(`Error processing chunk ${i + 1}:`, error);
-        throw error;
       }
-    }
 
-    return this.combineAudioChunks(audioChunks);
+      return this.combineAudioChunks(audioChunks);
+    } finally {
+      // Clean up event listener
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
   }
 
   private chunkText(text: string, maxLength: number): string[] {

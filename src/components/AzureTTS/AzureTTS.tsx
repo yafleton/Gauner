@@ -24,6 +24,7 @@ const AzureTTS: React.FC = () => {
   const [googleDriveAuthStatus, setGoogleDriveAuthStatus] = useState<'checking' | 'authenticated' | 'not-authenticated' | 'error'>('checking');
   const [isCleaning, setIsCleaning] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   // audioStorage removed - using Google Drive only
   const googleDriveStorage = useMemo(() => GoogleDriveStorageService.getInstance(), []);
@@ -76,6 +77,27 @@ const AzureTTS: React.FC = () => {
       loadVoices();
     }
   }, [ttsService, loadVoices]);
+
+  // Add page visibility detection for mobile browsers
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const isVisible = !document.hidden;
+      setIsPaused(!isVisible && isLoading);
+      
+      if (!isVisible && isLoading) {
+        console.log('📱 Mobile: Page hidden during audio generation - pausing');
+      } else if (isVisible && isPaused) {
+        console.log('📱 Mobile: Page visible again - resuming');
+        setIsPaused(false);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isLoading, isPaused]);
 
   // Handle transcript cleanup
   const handleCleanupTranscript = async () => {
@@ -749,16 +771,37 @@ const AzureTTS: React.FC = () => {
                 </div>
               )}
 
+              {/* Mobile Pause Warning */}
+              {isPaused && (
+                <div className="mt-4 bg-orange-900/20 border border-orange-500/50 rounded-lg p-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="animate-pulse">
+                      <div className="w-3 h-3 bg-orange-400 rounded-full"></div>
+                    </div>
+                    <div>
+                      <p className="text-orange-300 font-medium">Audio Generation Paused</p>
+                      <p className="text-orange-200 text-sm">
+                        📱 Switch back to this tab to continue generation
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Progress */}
               {isLoading && progress.total > 0 && (
                 <div className="mt-4">
                   <div className="flex justify-between text-sm text-text-secondary mb-2">
-                    <span>Processing chunks...</span>
+                    <span>{isPaused ? 'Paused - Switch back to continue...' : 'Processing chunks...'}</span>
                     <span>{progress.current} / {progress.total}</span>
                   </div>
                   <div className="w-full bg-dark-card rounded-full h-2">
                     <div
-                      className="bg-gradient-to-r from-accent-purple to-accent-blue h-2 rounded-full transition-all duration-300"
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        isPaused 
+                          ? 'bg-orange-500 animate-pulse' 
+                          : 'bg-gradient-to-r from-accent-purple to-accent-blue'
+                      }`}
                       style={{ width: `${(progress.current / progress.total) * 100}%` }}
                     ></div>
                   </div>
