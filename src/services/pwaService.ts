@@ -93,13 +93,13 @@ class PWAService {
   }
 
   async requestBackgroundSync(): Promise<void> {
-    if (!this.registration || !this.registration.sync) {
+    if (!this.registration || !('sync' in this.registration)) {
       console.log('❌ Background Sync not supported');
       return;
     }
 
     try {
-      await this.registration.sync.register('audio-generation');
+      await (this.registration as any).sync.register('audio-generation');
       console.log('✅ Background sync registered');
     } catch (error) {
       console.error('❌ Failed to register background sync:', error);
