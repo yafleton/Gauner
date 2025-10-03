@@ -1,7 +1,0 @@
-name = "gauner-backend"
-main = "worker.js"
-compatibility_date = "2024-01-01"
-
-# CPU and memory limits (free tier)
-cpu_limit = 10
-memory_limit = 128

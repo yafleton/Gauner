@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Mic, Loader, Save, Cloud } from 'lucide-react';
 import { useSimpleAuth } from '../../contexts/SimpleAuthContext';
-import { AzureTTSWorkerService } from '../../services/azureTTSWorker';
-import { getWorkerUrl } from '../../config/worker';
+import { AzureTTSService } from '../../services/azureTTS';
 import GoogleDriveStorageService from '../../services/googleDriveStorage';
 import { AzureVoice } from '../../types';
 import AudioLibrary from './AudioLibrary';
@@ -32,18 +31,16 @@ const AzureTTS: React.FC = () => {
     // Get API key from user object
     const currentApiKey = user?.azureApiKey;
     const currentRegion = user?.azureRegion || 'eastus';
-    const workerUrl = getWorkerUrl();
     
-    console.log('AzureTTS Worker: Creating service with:', {
+    console.log('AzureTTS: Creating service with:', {
       userId: user?.id,
       apiKey: currentApiKey ? `${currentApiKey.substring(0, 8)}...` : 'none',
       region: currentRegion,
-      workerUrl: workerUrl,
       hasApiKey: !!currentApiKey
     });
     
-    // Always create service with Worker backend
-    const service = new AzureTTSWorkerService(workerUrl);
+    // Always create service, even without API key (for voices)
+    const service = new AzureTTSService(currentApiKey || 'demo-key', currentRegion);
     
     // Set up retry callback
     service.setRetryCallback((attempt, maxAttempts) => {
@@ -61,12 +58,7 @@ const AzureTTS: React.FC = () => {
     try {
       setIsLoading(true);
       console.log('AzureTTS: Loading voices...');
-      
-      // Get API credentials for Worker
-      const currentApiKey = user?.azureApiKey;
-      const currentRegion = user?.azureRegion || 'eastus';
-      
-      const availableVoices = await ttsService.getAvailableVoices(currentApiKey, currentRegion);
+      const availableVoices = await ttsService.getAvailableVoices();
       console.log('AzureTTS: Received voices:', availableVoices.length);
       setVoices(availableVoices);
       
@@ -291,23 +283,15 @@ const AzureTTS: React.FC = () => {
         ttsServiceExists: !!ttsService
       });
 
-      // Get API credentials for Worker
-      const currentApiKey = user?.azureApiKey;
-      const currentRegion = user?.azureRegion || 'eastus';
-      
-      if (!currentApiKey) {
-        throw new Error('Azure TTS API key not configured.');
-      }
-
       const audioBuffer = await ttsService.synthesizeLongText(
         text,
         selectedVoice,
         languageCode,
-        currentApiKey,
-        currentRegion,
         async (current, total) => {
-          console.log(`📊 Worker Progress: ${current}/${total}`);
+          console.log(`📊 Progress: ${current}/${total}`);
           setProgress({ current, total });
+          
+          // Progress notification removed - PWA not working on iOS
         }
       );
 
