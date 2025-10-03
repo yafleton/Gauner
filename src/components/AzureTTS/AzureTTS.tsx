@@ -61,7 +61,12 @@ const AzureTTS: React.FC = () => {
     try {
       setIsLoading(true);
       console.log('AzureTTS: Loading voices...');
-      const availableVoices = await ttsService.getAvailableVoices();
+      
+      // Get API credentials for Worker
+      const currentApiKey = user?.azureApiKey;
+      const currentRegion = user?.azureRegion || 'eastus';
+      
+      const availableVoices = await ttsService.getAvailableVoices(currentApiKey, currentRegion);
       console.log('AzureTTS: Received voices:', availableVoices.length);
       setVoices(availableVoices);
       

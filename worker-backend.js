@@ -20,6 +20,8 @@ async function handleRequest(request) {
   try {
     if (url.pathname === '/api/tts' && request.method === 'POST') {
       return await handleTTSRequest(request, corsHeaders)
+    } else if (url.pathname === '/api/voices' && request.method === 'POST') {
+      return await handleVoicesRequest(request, corsHeaders)
     } else if (url.pathname === '/api/upload-to-drive' && request.method === 'POST') {
       return await handleGoogleDriveUpload(request, corsHeaders)
     }
@@ -181,6 +183,59 @@ function combineAudioBuffers(audioBuffers) {
   }
   
   return combinedBuffer.buffer
+}
+
+async function handleVoicesRequest(request, corsHeaders) {
+  try {
+    const body = await request.json()
+    const { apiKey, region } = body
+
+    if (!apiKey) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'API key required' 
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    console.log(`🎤 Worker: Fetching voices for region ${region}`)
+
+    const response = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/voices/list`, {
+      method: 'GET',
+      headers: {
+        'Ocp-Apim-Subscription-Key': apiKey,
+        'User-Agent': 'CloudflareWorker'
+      }
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Azure TTS voices API failed: ${response.status} - ${errorText}`)
+    }
+
+    const voices = await response.json()
+    console.log(`✅ Worker: Retrieved ${voices.length} voices`)
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      voices: voices 
+    }), { 
+      status: 200, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+
+  } catch (error) {
+    console.error('Worker voices error:', error)
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message 
+    }), { 
+      status: 500, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
 }
 
 async function handleGoogleDriveUpload(request, corsHeaders) {
