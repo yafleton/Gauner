@@ -23,9 +23,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "deploy-worker": "wrangler deploy",
-    "worker-dev": "wrangler dev"
+    "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
@@ -46,6 +44,6 @@
     ]
   },
   "devDependencies": {
-    "wrangler": "^3.0.0"
+    "@types/uuid": "^10.0.0"
   }
 }
