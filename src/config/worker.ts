@@ -2,7 +2,7 @@
 export const WORKER_CONFIG = {
   // This will be updated after deploying the worker
   // Replace 'your-subdomain' with your actual Cloudflare Worker subdomain
-  BASE_URL: 'https://gauner-backend.your-subdomain.workers.dev',
+  BASE_URL: 'https://gauner-backend.danielfahmy02.workers.dev',
   
   // Alternative: Use a custom domain if you have one
   // BASE_URL: 'https://api.gauner.com',
