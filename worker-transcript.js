@@ -29,22 +29,98 @@ export default {
       }
 
       try {
-        // Try different YouTube subtitle formats and URLs with different parameters
+        // Use yt-dlp approach - try to get subtitle URLs from video page
+        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        
+        try {
+          console.log(`Fetching video page: ${videoUrl}`);
+          
+          const response = await fetch(videoUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+          });
+
+          if (response.ok) {
+            const html = await response.text();
+            console.log(`Video page fetched, length: ${html.length}`);
+            
+            // Look for subtitle URLs in the page
+            const subtitleMatches = html.match(/"captionTracks":\[(.*?)\]/);
+            if (subtitleMatches) {
+              console.log('Found captionTracks in video page');
+              
+              try {
+                const captionData = JSON.parse(`[${subtitleMatches[1]}]`);
+                console.log(`Found ${captionData.length} caption tracks`);
+                
+                // Try to get subtitles from available tracks
+                for (const track of captionData) {
+                  if (track.baseUrl) {
+                    console.log(`Trying subtitle URL: ${track.baseUrl}`);
+                    
+                    const subtitleResponse = await fetch(track.baseUrl, {
+                      headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                      }
+                    });
+                    
+                    if (subtitleResponse.ok) {
+                      const subtitleContent = await subtitleResponse.text();
+                      console.log(`Subtitle content length: ${subtitleContent.length}`);
+                      
+                      // Parse XML subtitle content
+                      const textMatches = subtitleContent.match(/<text[^>]*>(.*?)<\/text>/g);
+                      if (textMatches && textMatches.length > 0) {
+                        const transcript = textMatches
+                          .map(match => {
+                            const textContent = match.replace(/<text[^>]*>(.*?)<\/text>/, '$1');
+                            return textContent
+                              .replace(/&quot;/g, '"')
+                              .replace(/&amp;/g, '&')
+                              .replace(/&lt;/g, '<')
+                              .replace(/&gt;/g, '>')
+                              .replace(/&#39;/g, "'")
+                              .replace(/&#34;/g, '"');
+                          })
+                          .join(' ')
+                          .trim();
+                        
+                        if (transcript && transcript.length > 10) {
+                          return new Response(JSON.stringify({
+                            success: true,
+                            transcript: transcript,
+                            format: 'xml',
+                            length: transcript.length,
+                            method: 'yt-dlp approach'
+                          }), {
+                            status: 200,
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Access-Control-Allow-Origin': '*',
+                            },
+                          });
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (parseError) {
+                console.log('Failed to parse caption data:', parseError);
+              }
+            }
+          }
+        } catch (error) {
+          console.log('Error fetching video page:', error);
+        }
+
+        // Fallback: try direct YouTube subtitle URLs
         const attempts = [
-          // Try with different language codes
           { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`, format: 'json3' },
-          { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=json3&kind=asr`, format: 'json3' },
           { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`, format: 'json3' },
           { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`, format: 'srv3' },
           { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=ttml`, format: 'ttml' },
-          { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=vtt`, format: 'vtt' },
-          // Try without language parameter
-          { url: `https://www.youtube.com/api/timedtext?v=${videoId}&fmt=json3`, format: 'json3' },
-          { url: `https://www.youtube.com/api/timedtext?v=${videoId}&fmt=srv3`, format: 'srv3' },
-          // Try alternative endpoints
-          { url: `https://video.google.com/timedtext?lang=en&v=${videoId}`, format: 'xml' },
-          { url: `https://video.google.com/timedtext?lang=en-US&v=${videoId}`, format: 'xml' },
-          { url: `https://video.google.com/timedtext?v=${videoId}`, format: 'xml' }
+          { url: `https://video.google.com/timedtext?lang=en&v=${videoId}`, format: 'xml' }
         ];
         
         const results = [];

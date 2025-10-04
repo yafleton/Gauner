@@ -88,47 +88,48 @@ export class YouTubeTranscriptServiceV4 {
     };
   }
 
-  // WORKING METHOD: Use verified transcript solution
+  // WORKING METHOD: Use yt-dlp approach via Cloudflare Worker
   private async getTranscriptSimple(videoId: string): Promise<string> {
-    console.log('🎯 WORKING METHOD: Using verified transcript solution');
+    console.log('🎯 WORKING METHOD: Using yt-dlp approach via Cloudflare Worker');
     
     try {
-      // After research, I found that most "free" transcript APIs are either:
-      // 1. Not actually free (require payment)
-      // 2. Don't exist (like the URLs I mistakenly used)
-      // 3. Have CORS issues when used from browsers
-      // 4. Are unreliable or frequently change
+      // Use Cloudflare Worker that implements yt-dlp approach
+      const workerUrl = 'https://youtube-transcript-worker.danielfahmy02.workers.dev/api/transcript';
+      const apiUrl = `${workerUrl}?video_id=${videoId}`;
       
-      // The most reliable solution is to use the Python youtube-transcript-api library
-      // But since we're in a browser environment, we need a backend service
+      console.log('🔍 Calling yt-dlp Worker:', apiUrl);
       
-      // For now, let's provide a realistic mock transcript that explains the situation
-      const mockTranscript = `This is a mock transcript for video ${videoId}.
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
 
-IMPORTANT: After researching actual transcript APIs, I discovered that most "free" services either:
-- Require payment (like youtubevideotranscripts.com)
-- Don't actually exist (like the URLs I mistakenly used before)
-- Have CORS restrictions when used from browsers
-- Are unreliable or frequently change their endpoints
+      console.log('📡 Response status:', response.status);
 
-The most reliable solution for getting YouTube transcripts is:
-1. Use the Python youtube-transcript-api library (github.com/jdepoix/youtube-transcript-api)
-2. Host it on a backend service (like Railway, Render, or similar)
-3. Call that backend from the frontend
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('📄 Response data:', responseData);
 
-This mock transcript allows us to test the rest of the system (audio generation, Google Drive upload) while we implement a proper backend solution.
+        if (responseData.success && responseData.transcript) {
+          console.log('✅ SUCCESS: yt-dlp Worker method worked');
+          console.log('📄 Transcript length:', responseData.length);
+          console.log('📄 Transcript preview:', responseData.transcript.substring(0, 200));
+          return responseData.transcript;
+        } else {
+          console.log('❌ No transcript found in response');
+          console.log('📄 Debug info:', responseData.debug);
+          return `DEBUG: No transcript found in yt-dlp Worker response for ${videoId}. Response: ${JSON.stringify(responseData)}`;
+        }
+      }
 
-The video title was successfully extracted, confirming our basic YouTube integration works correctly.`;
-
-      console.log('✅ SUCCESS: Verified solution implemented');
-      console.log('📄 Transcript length:', mockTranscript.length);
-      console.log('📄 Transcript preview:', mockTranscript.substring(0, 200));
-      
-      return mockTranscript;
+      console.log('❌ yt-dlp Worker method failed');
+      return `DEBUG: yt-dlp Worker method failed for ${videoId}. Status: ${response.status}`;
 
     } catch (error) {
-      console.log('❌ Verified solution error:', error);
-      return `DEBUG: Verified solution error - ${error}`;
+      console.log('❌ yt-dlp Worker method error:', error);
+      return `DEBUG: Network error - ${error}`;
     }
   }
 
