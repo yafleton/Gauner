@@ -88,120 +88,173 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // DIRECT YT-DLP METHOD: Use multiple yt-dlp services directly
+  // YOUTUBE SCRAPING METHOD: Direct YouTube page scraping for captions
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 DIRECT YT-DLP METHOD: Using multiple yt-dlp services directly');
+    console.log('🎯 YOUTUBE SCRAPING METHOD: Direct YouTube page scraping for captions');
     
-    // List of yt-dlp based services to try
-    const services = [
-      `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`,
-      `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`,
-      `https://api.vevioz.com/api/button/mp3/${videoId}`,
-      `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}&lang=en`,
-      `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}&lang=en`
-    ];
-    
-    for (let i = 0; i < services.length; i++) {
-      const serviceUrl = services[i];
+    try {
+      // Step 1: Get the YouTube video page
+      const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      console.log('🔍 Fetching YouTube page:', videoUrl);
       
-      try {
-        console.log(`🔍 Trying service ${i + 1}/${services.length}: ${serviceUrl}`);
-        
-        const response = await fetch(serviceUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json,*/*',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-          }
-        });
-
-        console.log(`📡 Service ${i + 1} response status:`, response.status);
-
-        if (response.ok) {
-          const jsonData = await response.text();
-          console.log(`📄 Service ${i + 1} response length:`, jsonData.length);
-          
-          if (jsonData && jsonData.trim().length > 0) {
-            try {
-              const data = JSON.parse(jsonData);
-              console.log(`🔍 Service ${i + 1} response structure:`, typeof data, Array.isArray(data) ? `Array(${data.length})` : Object.keys(data));
-              
-              // Extract transcript from various formats
-              let transcript = '';
-              
-              // Method 1: Direct array
-              if (Array.isArray(data) && data.length > 0) {
-                transcript = data
-                  .map((entry: any) => {
-                    if (typeof entry === 'string') return entry;
-                    if (entry.text) return entry.text;
-                    if (entry.content) return entry.content;
-                    if (entry.transcript) return entry.transcript;
-                    return '';
-                  })
-                  .filter((text: string) => text.trim().length > 0)
-                  .join(' ')
-                  .replace(/\s+/g, ' ')
-                  .trim();
-              }
-              
-              // Method 2: Nested transcript
-              else if (data.transcript && Array.isArray(data.transcript)) {
-                transcript = data.transcript
-                  .map((entry: any) => {
-                    if (typeof entry === 'string') return entry;
-                    if (entry.text) return entry.text;
-                    if (entry.content) return entry.content;
-                    return '';
-                  })
-                  .filter((text: string) => text.trim().length > 0)
-                  .join(' ')
-                  .replace(/\s+/g, ' ')
-                  .trim();
-              }
-              
-              // Method 3: Single text field
-              else if (data.text) {
-                transcript = data.text.trim();
-              }
-              
-              // Method 4: Content field
-              else if (data.content) {
-                transcript = data.content.trim();
-              }
-              
-              // Method 5: Look for any string value
-              else {
-                const stringValues = Object.values(data).filter(value => 
-                  typeof value === 'string' && value.trim().length > 50
-                );
-                if (stringValues.length > 0) {
-                  transcript = stringValues.join(' ').trim();
-                }
-              }
-              
-              if (transcript.length > 50) {
-                console.log(`✅ SUCCESS: Auto-subs extracted via service ${i + 1}`);
-                return transcript;
-              } else {
-                console.log(`❌ Service ${i + 1} transcript too short:`, transcript.length);
-              }
-            } catch (parseError) {
-              console.log(`❌ Service ${i + 1} JSON parse failed:`, parseError);
-              console.log(`📄 Service ${i + 1} raw response preview:`, jsonData.substring(0, 200));
-            }
-          } else {
-            console.log(`❌ Service ${i + 1} empty response`);
-          }
-        } else {
-          console.log(`❌ Service ${i + 1} returned status:`, response.status);
+      const pageResponse = await fetch(videoUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1'
         }
-      } catch (serviceError) {
-        console.log(`❌ Service ${i + 1} error:`, serviceError);
-      }
-    }
+      });
 
-    throw new Error('All yt-dlp services failed - no auto-subs found');
+      if (!pageResponse.ok) {
+        throw new Error(`Failed to fetch YouTube page: ${pageResponse.status}`);
+      }
+
+      const pageHtml = await pageResponse.text();
+      console.log('📄 YouTube page HTML length:', pageHtml.length);
+
+      // Step 2: Extract player_response JSON from the page
+      const playerResponseMatch = pageHtml.match(/var ytInitialPlayerResponse = ({.+?});/);
+      if (!playerResponseMatch) {
+        throw new Error('Could not find ytInitialPlayerResponse in page');
+      }
+
+      const playerResponseJson = playerResponseMatch[1];
+      console.log('🔍 Found player_response JSON, length:', playerResponseJson.length);
+
+      const playerResponse = JSON.parse(playerResponseJson);
+      console.log('🔍 Parsed player_response structure:', Object.keys(playerResponse));
+
+      // Step 3: Extract caption tracks
+      const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+      if (!captionTracks || !Array.isArray(captionTracks)) {
+        throw new Error('No caption tracks found in player response');
+      }
+
+      console.log('📝 Found caption tracks:', captionTracks.length);
+      captionTracks.forEach((track: any, index: number) => {
+        console.log(`  Track ${index}:`, {
+          name: track?.name?.simpleText,
+          languageCode: track?.languageCode,
+          kind: track?.kind,
+          isTranslatable: track?.isTranslatable
+        });
+      });
+
+      // Step 4: Try to find auto-generated English captions
+      let selectedTrack = captionTracks.find((track: any) => 
+        track?.languageCode === 'en' && track?.kind === 'asr'
+      );
+
+      // Fallback to any English track
+      if (!selectedTrack) {
+        selectedTrack = captionTracks.find((track: any) => 
+          track?.languageCode === 'en'
+        );
+      }
+
+      // Fallback to any auto-generated track
+      if (!selectedTrack) {
+        selectedTrack = captionTracks.find((track: any) => 
+          track?.kind === 'asr'
+        );
+      }
+
+      // Fallback to first available track
+      if (!selectedTrack) {
+        selectedTrack = captionTracks[0];
+      }
+
+      if (!selectedTrack?.baseUrl) {
+        throw new Error('No suitable caption track found');
+      }
+
+      console.log('🎯 Selected caption track:', {
+        name: selectedTrack?.name?.simpleText,
+        languageCode: selectedTrack?.languageCode,
+        kind: selectedTrack?.kind,
+        baseUrl: selectedTrack?.baseUrl?.substring(0, 100) + '...'
+      });
+
+      // Step 5: Fetch the caption XML
+      const captionUrl = selectedTrack.baseUrl;
+      console.log('🔍 Fetching caption XML:', captionUrl.substring(0, 100) + '...');
+
+      const captionResponse = await fetch(captionUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+
+      if (!captionResponse.ok) {
+        throw new Error(`Failed to fetch captions: ${captionResponse.status}`);
+      }
+
+      const captionXml = await captionResponse.text();
+      console.log('📄 Caption XML length:', captionXml.length);
+
+      // Step 6: Parse the caption XML
+      const transcript = this.parseCaptionXml(captionXml);
+      
+      if (transcript.length > 50) {
+        console.log('✅ SUCCESS: Transcript extracted via YouTube scraping method');
+        return transcript;
+      } else {
+        throw new Error('Transcript too short after parsing');
+      }
+
+    } catch (error) {
+      console.log('❌ YouTube scraping method failed:', error);
+      throw new Error(`YouTube scraping method failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Parse YouTube caption XML to extract text
+  private parseCaptionXml(xml: string): string {
+    console.log('🔍 Parsing caption XML...');
+    
+    try {
+      // Remove XML declaration and extract text content from <text> tags
+      const textMatches = xml.match(/<text[^>]*>(.*?)<\/text>/g);
+      
+      if (!textMatches || textMatches.length === 0) {
+        console.log('❌ No text tags found in caption XML');
+        return '';
+      }
+
+      console.log('📝 Found text segments:', textMatches.length);
+
+      const transcriptParts = textMatches.map(match => {
+        // Extract text content and decode HTML entities
+        const textContent = match.replace(/<text[^>]*>(.*?)<\/text>/, '$1');
+        
+        // Decode HTML entities
+        const decoded = textContent
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&#34;/g, '"')
+          .replace(/&#x27;/g, "'");
+        
+        return decoded.trim();
+      }).filter(text => text.length > 0);
+
+      const transcript = transcriptParts.join(' ').replace(/\s+/g, ' ').trim();
+      
+      console.log('📄 Parsed transcript length:', transcript.length);
+      console.log('📄 Transcript preview:', transcript.substring(0, 200) + '...');
+      
+      return transcript;
+    } catch (error) {
+      console.log('❌ Failed to parse caption XML:', error);
+      return '';
+    }
   }
 
   // Parse XML captions
