@@ -1,0 +1,14 @@
+name = "youtube-transcript-worker"
+main = "worker-python.py"
+compatibility_date = "2024-01-01"
+
+[env.production]
+name = "youtube-transcript-worker"
+
+# Python runtime configuration
+[build]
+command = "pip install youtube-transcript-api"
+
+# CORS configuration
+[triggers]
+crons = []

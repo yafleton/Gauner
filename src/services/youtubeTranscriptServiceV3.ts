@@ -88,31 +88,76 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // WORKING TRANSCRIPT: Use YouTube Transcript API (Python-based services)
+  // WORKING TRANSCRIPT: Use Cloudflare Worker with Python youtube-transcript-api
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 WORKING TRANSCRIPT: Using YouTube Transcript API services');
+    console.log('🎯 WORKING TRANSCRIPT: Using Cloudflare Worker with Python youtube-transcript-api');
+    
+    try {
+      // Use our Cloudflare Worker with Python
+      const workerUrl = 'https://youtube-transcript-worker.yafleton.workers.dev';
+      const transcriptUrl = `${workerUrl}?video_id=${videoId}`;
+      
+      console.log('🔍 Calling Cloudflare Worker:', transcriptUrl);
+      
+      const response = await fetch(transcriptUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('📡 Worker response status:', response.status);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('📄 Worker response data:', responseData);
+
+        if (responseData.success && responseData.transcript) {
+          const transcript = responseData.transcript.trim();
+          
+          console.log(`✅ SUCCESS: Real transcript extracted via Cloudflare Worker`);
+          console.log(`📄 Transcript length: ${transcript.length} characters`);
+          console.log(`📄 Transcript preview: ${transcript.substring(0, 200)}...`);
+          console.log(`📊 Segments count: ${responseData.segments_count}`);
+          
+          return transcript;
+        } else {
+          console.log('❌ Worker returned error:', responseData.error);
+          return `Transcript extraction failed: ${responseData.error || 'Unknown error'}`;
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.log('❌ Worker request failed:', response.status, errorData);
+        return `Transcript extraction failed: HTTP ${response.status} - ${errorData.error || 'Unknown error'}`;
+      }
+
+    } catch (error) {
+      console.log('❌ Cloudflare Worker error:', error);
+      
+      // Fallback to external services if worker fails
+      console.log('🔄 Falling back to external services...');
+      return await this.getTranscriptFallback(videoId);
+    }
+  }
+
+  // Fallback method using external services
+  private async getTranscriptFallback(videoId: string): Promise<string> {
+    console.log('🎯 FALLBACK: Using external YouTube Transcript API services');
     
     // Services that use the youtube-transcript-api Python library
     const services = [
       {
         name: 'YouTube Transcript API (Heroku)',
-        url: `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`,
-        method: 'GET'
+        url: `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`
       },
       {
         name: 'YouTube Transcript API (Vercel)',
-        url: `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`,
-        method: 'GET'
+        url: `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`
       },
       {
         name: 'Transcript API (Alternative)',
-        url: `https://api.vevioz.com/api/button/mp3/${videoId}`,
-        method: 'GET'
-      },
-      {
-        name: 'YouTube Transcript (Netlify)',
-        url: `https://youtube-transcript-api.netlify.app/api/transcript?video_id=${videoId}`,
-        method: 'GET'
+        url: `https://api.vevioz.com/api/button/mp3/${videoId}`
       }
     ];
 
@@ -121,96 +166,51 @@ export class YouTubeTranscriptServiceV3 {
       const service = services[i];
       
       try {
-        console.log(`🔍 Trying service ${i + 1}/${services.length}: ${service.name}`);
-        console.log(`📡 URL: ${service.url}`);
+        console.log(`🔍 Trying fallback service ${i + 1}/${services.length}: ${service.name}`);
         
         const response = await fetch(service.url, {
-          method: service.method,
+          method: 'GET',
           headers: {
             'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'Content-Type': 'application/json'
           }
         });
 
-        console.log(`📡 Response status: ${response.status}`);
+        console.log(`📡 Fallback response status: ${response.status}`);
 
         if (response.ok) {
-          const responseText = await response.text();
-          console.log(`📄 Response length: ${responseText.length}`);
-          console.log(`📄 Response preview: ${responseText.substring(0, 200)}...`);
-          
-          if (responseText && responseText.trim().length > 0) {
-            try {
-              const data = JSON.parse(responseText);
-              console.log('🔍 Parsed data:', data);
+          const responseData = await response.json();
+          console.log('📄 Fallback response data:', responseData);
 
-              // Handle different response formats from youtube-transcript-api
-              let transcript = '';
+          // Handle different response formats
+          let transcript = '';
 
-              if (Array.isArray(data)) {
-                // Format 1: Direct array (youtube-transcript-api format)
-                transcript = data
-                  .map((item: any) => {
-                    if (typeof item === 'string') return item;
-                    if (item.text) return item.text;
-                    if (item.content) return item.content;
-                    return '';
-                  })
-                  .filter((text: string) => text.trim().length > 0)
-                  .join(' ')
-                  .trim();
-              } else if (data.transcript && Array.isArray(data.transcript)) {
-                // Format 2: Nested transcript array
-                transcript = data.transcript
-                  .map((item: any) => {
-                    if (typeof item === 'string') return item;
-                    if (item.text) return item.text;
-                    if (item.content) return item.content;
-                    return '';
-                  })
-                  .filter((text: string) => text.trim().length > 0)
-                  .join(' ')
-                  .trim();
-              } else if (data.text) {
-                // Format 3: Direct text field
-                transcript = data.text.trim();
-              } else if (data.content) {
-                // Format 4: Content field
-                transcript = data.content.trim();
-              } else if (data.transcript) {
-                // Format 5: Transcript field (string)
-                transcript = data.transcript.trim();
-              }
-
-              console.log(`📄 Extracted transcript length: ${transcript.length}`);
-              console.log(`📄 Transcript preview: ${transcript.substring(0, 200)}...`);
-
-              if (transcript.length > 50) {
-                console.log(`✅ SUCCESS: Real transcript extracted via ${service.name}`);
-                return transcript.replace(/\s+/g, ' ').trim();
-              } else {
-                console.log(`❌ Service ${i + 1} transcript too short: ${transcript.length} chars`);
-              }
-            } catch (parseError) {
-              console.log(`❌ Service ${i + 1} JSON parse failed:`, parseError);
-              console.log(`📄 Raw response:`, responseText);
-            }
-          } else {
-            console.log(`❌ Service ${i + 1} empty response`);
+          if (Array.isArray(responseData)) {
+            transcript = responseData
+              .map((item: any) => item.text || item.content || item)
+              .filter((text: string) => text && text.trim().length > 0)
+              .join(' ')
+              .trim();
+          } else if (responseData.transcript) {
+            transcript = responseData.transcript.trim();
+          } else if (responseData.text) {
+            transcript = responseData.text.trim();
           }
-        } else {
-          console.log(`❌ Service ${i + 1} failed with status: ${response.status}`);
+
+          if (transcript.length > 50) {
+            console.log(`✅ SUCCESS: Transcript extracted via fallback ${service.name}`);
+            return transcript;
+          }
         }
       } catch (error) {
-        console.log(`❌ Service ${i + 1} error:`, error);
+        console.log(`❌ Fallback service ${i + 1} error:`, error);
       }
     }
 
-    // If all services fail, provide helpful message
-    const fallbackMessage = `Transcript extraction failed for video ${videoId}. All YouTube Transcript API services are currently unavailable. This is likely because YouTube has changed their API or the services are temporarily down. You can try again later or manually add text to the queue using the Voice tab.`;
+    // If all methods fail
+    const fallbackMessage = `Transcript extraction failed for video ${videoId}. Both the Cloudflare Worker and external services are unavailable. YouTube's transcript APIs are heavily protected and require server-side implementation. You can try again later or manually add text using the Voice tab.`;
     
-    console.log('⚠️ All YouTube Transcript API services failed');
+    console.log('⚠️ All transcript extraction methods failed');
     return fallbackMessage;
   }
 
