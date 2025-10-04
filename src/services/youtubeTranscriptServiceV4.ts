@@ -88,17 +88,18 @@ export class YouTubeTranscriptServiceV4 {
     };
   }
 
-  // WORKING METHOD: Use Vercel-based transcript API
+  // WORKING METHOD: Use CORS proxy to access transcript API
   private async getTranscriptSimple(videoId: string): Promise<string> {
-    console.log('🎯 WORKING METHOD: Using Vercel-based transcript API');
+    console.log('🎯 WORKING METHOD: Using CORS proxy to access transcript API');
     
     try {
-      // Use Vercel-based transcript API service
-      const apiUrl = `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`;
+      // Use CORS proxy to bypass browser restrictions
+      const targetUrl = `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`;
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
       
-      console.log('🔍 Calling Vercel transcript API:', apiUrl);
+      console.log('🔍 Calling via CORS proxy:', proxyUrl);
       
-      const response = await fetch(apiUrl, {
+      const response = await fetch(proxyUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
@@ -137,21 +138,21 @@ export class YouTubeTranscriptServiceV4 {
         }
 
         if (transcript && transcript.length > 10) {
-          console.log('✅ SUCCESS: Vercel transcript API worked');
+          console.log('✅ SUCCESS: CORS proxy method worked');
           console.log('📄 Transcript length:', transcript.length);
           console.log('📄 Transcript preview:', transcript.substring(0, 200));
           return transcript;
         } else {
           console.log('❌ No transcript found in response');
-          return `DEBUG: No transcript found in Vercel API response for ${videoId}. Response: ${JSON.stringify(responseData).substring(0, 200)}`;
+          return `DEBUG: No transcript found in CORS proxy response for ${videoId}. Response: ${JSON.stringify(responseData).substring(0, 200)}`;
         }
       }
 
-      console.log('❌ Vercel transcript API failed');
-      return `DEBUG: Vercel transcript API failed for ${videoId}. Status: ${response.status}`;
+      console.log('❌ CORS proxy method failed');
+      return `DEBUG: CORS proxy method failed for ${videoId}. Status: ${response.status}`;
 
     } catch (error) {
-      console.log('❌ Vercel transcript API error:', error);
+      console.log('❌ CORS proxy method error:', error);
       return `DEBUG: Network error - ${error}`;
     }
   }
