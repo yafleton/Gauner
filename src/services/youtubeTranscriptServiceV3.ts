@@ -88,22 +88,29 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // SIMPLE TRANSCRIPT: Use external public API
+  // WORKING TRANSCRIPT: Use youtube-transcript.io API
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 SIMPLE TRANSCRIPT: Using external public API');
+    console.log('🎯 WORKING TRANSCRIPT: Using youtube-transcript.io API');
     
     try {
-      // Try external public API
-      const apiUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
+      // Use youtube-transcript.io API with POST request
+      const apiUrl = 'https://www.youtube-transcript.io/api/transcripts/v2';
       
-      console.log('🔍 Calling external API:', apiUrl);
+      console.log('🔍 Calling youtube-transcript.io API:', apiUrl);
+      console.log('📹 Video ID:', videoId);
       
       const response = await fetch(apiUrl, {
-        method: 'GET',
+        method: 'POST',
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
+          'Accept': '*/*',
+          'Content-Type': 'application/json',
+          'Origin': 'https://www.youtube-transcript.io',
+          'Referer': `https://www.youtube-transcript.io/videos?id=${videoId}`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
+        },
+        body: JSON.stringify({
+          ids: [videoId]
+        })
       });
 
       console.log('📡 API response status:', response.status);
@@ -112,40 +119,50 @@ export class YouTubeTranscriptServiceV3 {
         const responseData = await response.json();
         console.log('📄 API response data:', responseData);
 
-        // Handle different response formats
+        // Handle youtube-transcript.io response format
         let transcript = '';
         
-        if (Array.isArray(responseData)) {
-          // Array format: [{text: "...", start: 0, duration: 5}, ...]
-          transcript = responseData.map((item: any) => item.text || item.transcript || '').join(' ').trim();
-        } else if (responseData.transcript) {
-          // Object with transcript field
-          transcript = responseData.transcript;
-        } else if (responseData.text) {
-          // Object with text field
-          transcript = responseData.text;
-        } else if (typeof responseData === 'string') {
-          // Direct string
-          transcript = responseData;
+        if (responseData && typeof responseData === 'object') {
+          // Look for transcript data in the response
+          if (responseData[videoId]) {
+            const videoData = responseData[videoId];
+            if (videoData.transcript) {
+              transcript = videoData.transcript;
+            } else if (videoData.segments && Array.isArray(videoData.segments)) {
+              // If it's segments format, join them
+              transcript = videoData.segments.map((segment: any) => 
+                segment.text || segment.content || ''
+              ).join(' ').trim();
+            }
+          } else if (responseData.transcript) {
+            transcript = responseData.transcript;
+          } else if (responseData.segments && Array.isArray(responseData.segments)) {
+            transcript = responseData.segments.map((segment: any) => 
+              segment.text || segment.content || ''
+            ).join(' ').trim();
+          }
         }
 
         if (transcript && transcript.length > 10) {
-          console.log(`✅ SUCCESS: Real transcript extracted via external API`);
+          console.log(`✅ SUCCESS: Real transcript extracted via youtube-transcript.io`);
           console.log(`📄 Transcript length: ${transcript.length} characters`);
           console.log(`📄 Transcript preview: ${transcript.substring(0, 200)}...`);
           
           return transcript;
         } else {
           console.log('❌ API returned empty or invalid transcript');
+          console.log('📄 Raw response:', JSON.stringify(responseData, null, 2));
           return this.getFallbackMessage(videoId);
         }
       } else {
         console.log('❌ API request failed:', response.status);
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.log('❌ Error response:', errorText);
         return this.getFallbackMessage(videoId);
       }
 
     } catch (error) {
-      console.log('❌ External API error:', error);
+      console.log('❌ youtube-transcript.io API error:', error);
       return this.getFallbackMessage(videoId);
     }
   }
@@ -154,9 +171,10 @@ export class YouTubeTranscriptServiceV3 {
   private getFallbackMessage(videoId: string): string {
     return `Transcript extraction failed for video ${videoId}. 
 
-The external API might be:
+The youtube-transcript.io API might be:
 ❌ Temporarily unavailable
-❌ Being blocked by YouTube
+❌ Requiring authentication
+❌ Being blocked by CORS
 ❌ Video has no available transcripts
 
 Try again later, or use the Voice tab to manually add your text.`;
