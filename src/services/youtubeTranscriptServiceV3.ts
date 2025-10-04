@@ -88,124 +88,145 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // SINGLE DIRECT METHOD: YouTube get_video_info API
+  // NEW METHOD: YouTube Transcript API via public service
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 SINGLE DIRECT METHOD: YouTube get_video_info API');
+    console.log('🎯 NEW METHOD: YouTube Transcript API via public service');
     
     try {
-      // Use YouTube's get_video_info endpoint to get transcript data
-      const apiUrl = `https://www.youtube.com/get_video_info?video_id=${videoId}&el=detailpage&ps=default&eurl=&gl=US&hl=en`;
+      // Use a public transcript API service that mimics youtube-transcript-api
+      const apiUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`;
       
-      console.log('🔍 Using direct YouTube API:', apiUrl);
+      console.log('🔍 Using YouTube timedtext API:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'Accept': 'application/xml,text/xml,*/*',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://www.youtube.com/'
         }
       });
 
       console.log('📡 Response status:', response.status);
 
       if (response.ok) {
-        const data = await response.text();
-        console.log('📄 Response length:', data.length);
+        const xmlData = await response.text();
+        console.log('📄 XML response length:', xmlData.length);
         
-        if (data && data.trim().length > 0) {
-          // Parse URL-encoded data
-          const urlParams = new URLSearchParams(data);
-          const playerResponse = urlParams.get('player_response');
-          
-          if (playerResponse) {
-            try {
-              const playerData = JSON.parse(playerResponse);
-              console.log('🔍 Player data keys:', Object.keys(playerData));
-              
-              // Look for captions in player data
-              if (playerData.captions && playerData.captions.playerCaptionsTracklistRenderer) {
-                const captions = playerData.captions.playerCaptionsTracklistRenderer.captionTracks;
-                console.log('🔍 Found captions:', captions);
-                
-                if (captions && captions.length > 0) {
-                  // Try to get auto-generated captions first
-                  const autoCaption = captions.find((cap: any) => cap.kind === 'asr');
-                  const caption = autoCaption || captions[0];
-                  
-                  if (caption && caption.baseUrl) {
-                    console.log('🔍 Using caption URL:', caption.baseUrl);
-                    
-                    // Fetch the actual caption data
-                    const captionResponse = await fetch(caption.baseUrl);
-                    if (captionResponse.ok) {
-                      const captionXml = await captionResponse.text();
-                      console.log('📄 Caption XML length:', captionXml.length);
-                      
-                      // Parse XML captions
-                      const transcript = this.parseXmlCaptions(captionXml);
-                      if (transcript && transcript.length > 50) {
-                        console.log('✅ SUCCESS: Transcript extracted via YouTube get_video_info');
-                        return transcript;
-                      }
-                    }
-                  }
-                }
-              }
-              
-              console.log('❌ No captions found in player data');
-            } catch (parseError) {
-              console.log('❌ Player data parse failed:', parseError);
-            }
+        if (xmlData && xmlData.trim().length > 0) {
+          // Parse XML captions
+          const transcript = this.parseXmlCaptions(xmlData);
+          if (transcript && transcript.length > 50) {
+            console.log('✅ SUCCESS: Transcript extracted via YouTube timedtext API');
+            return transcript;
           } else {
-            console.log('❌ No player_response in URL params');
+            console.log('❌ Transcript too short:', transcript.length);
           }
         } else {
-          console.log('❌ Empty response data');
+          console.log('❌ Empty XML response');
         }
       } else {
         console.log('❌ API returned status:', response.status);
+        
+        // Try alternative format
+        const altApiUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`;
+        console.log('🔍 Trying alternative format:', altApiUrl);
+        
+        const altResponse = await fetch(altApiUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json,*/*',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://www.youtube.com/'
+          }
+        });
+
+        console.log('📡 Alt response status:', altResponse.status);
+
+        if (altResponse.ok) {
+          const jsonData = await altResponse.text();
+          console.log('📄 JSON response length:', jsonData.length);
+          
+          if (jsonData && jsonData.trim().length > 0) {
+            try {
+              const parsedData = JSON.parse(jsonData);
+              console.log('🔍 JSON data structure:', Object.keys(parsedData));
+              
+              if (parsedData.events && Array.isArray(parsedData.events)) {
+                const transcript = parsedData.events
+                  .filter((event: any) => event.segs && Array.isArray(event.segs))
+                  .map((event: any) => event.segs.map((seg: any) => seg.utf8).join(''))
+                  .join(' ')
+                  .trim();
+                
+                if (transcript.length > 50) {
+                  console.log('✅ SUCCESS: Transcript extracted via alternative JSON format');
+                  return transcript;
+                }
+              }
+            } catch (parseError) {
+              console.log('❌ JSON parse failed:', parseError);
+            }
+          }
+        }
       }
     } catch (error) {
-      console.log('❌ Direct API failed:', error);
+      console.log('❌ New method failed:', error);
     }
 
-    throw new Error('Direct YouTube API failed - no transcript found');
+    throw new Error('New transcript method failed - no transcript found');
   }
 
   // Parse XML captions
   private parseXmlCaptions(xml: string): string {
     try {
       console.log('🔍 Parsing XML captions...');
+      console.log('📄 XML preview:', xml.substring(0, 500));
       
-      // Extract text from XML captions
-      const textMatches = xml.match(/<text[^>]*>([^<]*)<\/text>/g);
+      // Extract text from XML captions - try multiple patterns
+      const patterns = [
+        /<text[^>]*>([^<]*)<\/text>/g,  // Standard pattern
+        /<text[^>]*start="[^"]*"[^>]*>([^<]*)<\/text>/g,  // With start time
+        /<p[^>]*>([^<]*)<\/p>/g,  // Paragraph pattern
+        /<span[^>]*>([^<]*)<\/span>/g  // Span pattern
+      ];
       
-      if (textMatches && textMatches.length > 0) {
-        const transcript = textMatches
-          .map(match => {
-            const textContent = match.match(/<text[^>]*>([^<]*)<\/text>/);
-            return textContent ? textContent[1] : '';
-          })
-          .filter(text => text.trim().length > 0)
-          .join(' ')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/\s+/g, ' ')
-          .trim();
-        
-        console.log(`✅ Parsed XML transcript (${transcript.length} chars)`);
-        return transcript;
+      let transcript = '';
+      
+      for (const pattern of patterns) {
+        const matches = xml.match(pattern);
+        if (matches && matches.length > 0) {
+          console.log(`✅ Found ${matches.length} matches with pattern:`, pattern);
+          
+          transcript = matches
+            .map(match => {
+              const textContent = match.match(/>([^<]*)</);
+              return textContent ? textContent[1] : '';
+            })
+            .filter(text => text.trim().length > 0)
+            .join(' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          
+          if (transcript.length > 50) {
+            console.log(`✅ Parsed XML transcript (${transcript.length} chars)`);
+            return transcript;
+          }
+        }
       }
       
-      console.log('❌ No text elements found in XML');
+      console.log('❌ No text elements found in XML with any pattern');
+      return '';
     } catch (error) {
       console.log('❌ XML parse error:', error);
+      return '';
     }
-    
-    return '';
   }
 
 
