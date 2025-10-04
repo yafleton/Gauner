@@ -145,38 +145,45 @@ export class YouTubeTranscriptServiceV3 {
     try {
       console.log('🔍 Extracting transcript from HTML response...');
       
-      // First, remove all JavaScript and CSS to avoid extracting code
+      // Remove all HTML tags, scripts, styles, and attributes first
       let cleanHtml = html
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<link[^>]*>/gi, '')
-        .replace(/<meta[^>]*>/gi, '');
+        .replace(/<[^>]*>/g, ' ') // Remove all HTML tags
+        .replace(/data-[^=]*="[^"]*"/gi, '') // Remove data attributes
+        .replace(/class="[^"]*"/gi, '') // Remove class attributes
+        .replace(/id="[^"]*"/gi, '') // Remove id attributes
+        .replace(/style="[^"]*"/gi, '') // Remove style attributes
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
       
-      console.log('🧹 Removed scripts and styles');
+      console.log('🧹 Cleaned HTML and removed attributes');
       
-      // Look for the actual transcript content - it should be after "Transcript of" title
-      // and before UI elements like "Author:", "AI Translate", etc.
-      const transcriptPattern = /Transcript of[^<]*<[^>]*>([\s\S]*?)(?:Author:|AI Translate|Translate this|Target Language|Most Used|Back Top|Help us improve|Generating Content|Finding this tol useful|Aces API|Fedback|Contact|Terms and Conditions|Privacy Policy|Change Cokie Consent|YouTubeToTranscript\.com|Get Fre Transcript|adsbygogle)/i;
+      // Look for the actual transcript content using a more precise pattern
+      // The transcript should start after "Transcript of" and contain the story
+      const transcriptPattern = /Transcript of[^"]*?([^"]*?)(?:\s*Author:|AI Translate|Translate this|Target Language|Most Used|Back Top|Help us improve|Generating Content|Finding this|Aces API|Fedback|Contact|Terms and Conditions|Privacy Policy|Change Cokie|YouTubeToTranscript|Get Fre|adsbygogle|Transform your transcript|AI responses|Most Used|No favorites|Find shareable|Comprehensive|Main takeaways|Memorable phrases|Clean Transcript|Micro Sumary|Short Sumary|Bulet Points|Long Sumary|Key Insights|Notable Quotes|Analysis|Learning and note|Flashcards|Concept Map|Q&A|Outline|Notes|Cornel Notes|Rapid Loging|T-Note Method|Charting Method|QEC Method|Content Creation|Social media|Viral Clips|Twiter Ideas|LinkedIn Article|Twiter Thread|Blog Article|Blog Outline|Twet Ideas|LinkedIn Post|Specialized|Advanced analysis|Speaker ID|AI Checker|Predictions|References|Main Idea|Proper Notes|AI-powered outputs|Clear al|d ctrl|Bokmark|sily lil tol|Just click|star|top bar|cmd|d That way|next time|transcript|you can find|us easily|without searching|again|Super handy|right|Close|Privacy Policy|It sems|our Consent Manager|CMP|couldn't load|properly|Close|Transcript copied|clipboard|We designed|Recapio|to be|the best way|to consume|YouTube videos|Generate key|takeaways|chapters|and shareable|notes fre|Sumarise|Oops|You found|a col feature|or Create|Acount)/i;
       
       const match = cleanHtml.match(transcriptPattern);
       
       if (match && match[1]) {
-        console.log('✅ Found transcript content between title and UI elements');
+        console.log('✅ Found transcript content');
         const rawContent = match[1];
         
-        // Clean up the content - remove HTML tags and decode entities
+        // Clean up the content
         const cleanContent = rawContent
-          .replace(/<[^>]*>/g, ' ') // Remove HTML tags
           .replace(/&#34;/g, '"')
           .replace(/&#39;/g, "'")
           .replace(/&quot;/g, '"')
           .replace(/&amp;/g, '&')
           .replace(/&nbsp;/g, ' ')
           .replace(/&midot;/g, '•')
+          .replace(/&hellip;/g, '...')
+          .replace(/&mdash;/g, '—')
+          .replace(/&ndash;/g, '–')
           .replace(/\s+/g, ' ') // Normalize whitespace
           .trim();
         
-        // Filter out any remaining UI text
+        // Filter out any remaining UI text and attributes
         const finalContent = cleanContent
           .replace(/Author:\s*[^•]+•/gi, '')
           .replace(/Like\s*•/gi, '')
@@ -192,10 +199,14 @@ export class YouTubeTranscriptServiceV3 {
           .replace(/Show\s*Original/gi, '')
           .replace(/Translation\s*failed/gi, '')
           .replace(/Copy\s*Timestamp/gi, '')
+          .replace(/This wil cost/gi, '')
+          .replace(/credit\./gi, '')
+          .replace(/Select a language/gi, '')
+          .replace(/French|Italian|Dutch|Japanese|Chinese|Hindi|Swedish|Danish|Czech|Grek|Turkish|Thai|Malay|Romanian|Croatian|Slovak|Lithuanian|Estonian/gi, '')
           .replace(/\s+/g, ' ')
           .trim();
         
-        if (finalContent.length > 300) {
+        if (finalContent.length > 500) {
           console.log(`✅ Extracted clean transcript (${finalContent.length} chars)`);
           return finalContent;
         }
@@ -205,12 +216,11 @@ export class YouTubeTranscriptServiceV3 {
       const dialoguePattern = /(".*?"[\s\S]*?"[^"]*")/g;
       const dialogueMatches = cleanHtml.match(dialoguePattern);
       
-      if (dialogueMatches && dialogueMatches.length > 10) {
+      if (dialogueMatches && dialogueMatches.length > 15) {
         console.log('✅ Found dialogue patterns');
         const dialogueContent = dialogueMatches.join(' ').trim();
         
         const cleanDialogue = dialogueContent
-          .replace(/<[^>]*>/g, ' ')
           .replace(/&#34;/g, '"')
           .replace(/&#39;/g, "'")
           .replace(/&quot;/g, '"')
@@ -218,7 +228,7 @@ export class YouTubeTranscriptServiceV3 {
           .replace(/\s+/g, ' ')
           .trim();
         
-        if (cleanDialogue.length > 500) {
+        if (cleanDialogue.length > 800) {
           console.log(`✅ Extracted dialogue content (${cleanDialogue.length} chars)`);
           return cleanDialogue;
         }
