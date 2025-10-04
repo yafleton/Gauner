@@ -88,147 +88,132 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // DIFFERENT API METHOD: Use a different public transcript service
+  // YT-DLP METHOD: Use yt-dlp for auto-subs extraction
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 DIFFERENT API METHOD: Using different public transcript service');
+    console.log('🎯 YT-DLP METHOD: Using yt-dlp for auto-subs extraction');
     
     try {
-      // Try a different public transcript API service
-      const apiUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
+      // Try local yt-dlp server first
+      const localApiUrl = `http://localhost:3001/api/transcript/${videoId}`;
       
-      console.log('🔍 Using different public API:', apiUrl);
+      console.log('🔍 Trying local yt-dlp server:', localApiUrl);
       
-      const response = await fetch(apiUrl, {
+      try {
+        const response = await fetch(localApiUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json,*/*'
+          }
+        });
+
+        console.log('📡 Local server response status:', response.status);
+
+        if (response.ok) {
+          const jsonData = await response.text();
+          console.log('📄 Local server response length:', jsonData.length);
+          
+          if (jsonData && jsonData.trim().length > 0) {
+            try {
+              const data = JSON.parse(jsonData);
+              console.log('🔍 Local server response:', data);
+              
+              if (data.transcript && data.transcript.length > 50) {
+                console.log('✅ SUCCESS: Auto-subs extracted via local yt-dlp server');
+                return data.transcript;
+              } else {
+                console.log('❌ Local server transcript too short:', data.transcript?.length || 0);
+              }
+            } catch (parseError) {
+              console.log('❌ Local server JSON parse failed:', parseError);
+            }
+          }
+        } else {
+          console.log('❌ Local yt-dlp server not available:', response.status);
+        }
+      } catch (localError) {
+        console.log('❌ Local yt-dlp server error:', localError);
+      }
+      
+      // Fallback to public yt-dlp service
+      const publicApiUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
+      
+      console.log('🔍 Fallback to public yt-dlp API:', publicApiUrl);
+      
+      const response = await fetch(publicApiUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json,*/*',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Origin': 'https://youtube-transcript-api.herokuapp.com'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
       });
 
-      console.log('📡 Response status:', response.status);
+      console.log('📡 Public API response status:', response.status);
 
       if (response.ok) {
         const jsonData = await response.text();
-        console.log('📄 JSON response length:', jsonData.length);
-        console.log('📄 JSON response preview:', jsonData.substring(0, 200));
+        console.log('📄 Public API response length:', jsonData.length);
         
         if (jsonData && jsonData.trim().length > 0) {
           try {
             const data = JSON.parse(jsonData);
-            console.log('🔍 Full API response:', data);
+            console.log('🔍 Public API response structure:', typeof data, Array.isArray(data) ? `Array(${data.length})` : Object.keys(data));
             
-            // Try to extract transcript from any possible format
+            // yt-dlp typically returns an array of transcript entries
             let transcript = '';
             
-            // Method 1: Direct array
             if (Array.isArray(data) && data.length > 0) {
+              // yt-dlp format: array of objects with text and duration
               transcript = data
-                .map((item: any) => {
-                  if (typeof item === 'string') return item;
-                  if (item.text) return item.text;
-                  if (item.content) return item.content;
-                  if (item.transcript) return item.transcript;
+                .map((entry: any) => {
+                  if (typeof entry === 'string') return entry;
+                  if (entry.text) return entry.text;
+                  if (entry.content) return entry.content;
+                  if (entry.transcript) return entry.transcript;
                   return '';
                 })
                 .filter((text: string) => text.trim().length > 0)
                 .join(' ')
+                .replace(/\s+/g, ' ')
                 .trim();
-            }
-            
-            // Method 2: Nested transcript
-            else if (data.transcript && Array.isArray(data.transcript)) {
+            } else if (data.transcript && Array.isArray(data.transcript)) {
               transcript = data.transcript
-                .map((item: any) => {
-                  if (typeof item === 'string') return item;
-                  if (item.text) return item.text;
-                  if (item.content) return item.content;
+                .map((entry: any) => {
+                  if (typeof entry === 'string') return entry;
+                  if (entry.text) return entry.text;
+                  if (entry.content) return entry.content;
                   return '';
                 })
                 .filter((text: string) => text.trim().length > 0)
                 .join(' ')
+                .replace(/\s+/g, ' ')
                 .trim();
-            }
-            
-            // Method 3: Single text field
-            else if (data.text) {
+            } else if (data.text) {
               transcript = data.text.trim();
-            }
-            
-            // Method 4: Content field
-            else if (data.content) {
+            } else if (data.content) {
               transcript = data.content.trim();
             }
             
-            // Method 5: Look for any string value
-            else {
-              const stringValues = Object.values(data).filter(value => 
-                typeof value === 'string' && value.trim().length > 50
-              );
-              if (stringValues.length > 0) {
-                transcript = stringValues.join(' ').trim();
-              }
-            }
-            
             if (transcript.length > 50) {
-              console.log('✅ SUCCESS: Transcript extracted via different API method');
-              return transcript.replace(/\s+/g, ' ').trim();
+              console.log('✅ SUCCESS: Auto-subs extracted via public yt-dlp API');
+              return transcript;
             } else {
-              console.log('❌ Transcript too short:', transcript.length);
+              console.log('❌ Public API transcript too short:', transcript.length);
             }
           } catch (parseError) {
-            console.log('❌ JSON parse failed:', parseError);
-            console.log('📄 Raw response:', jsonData);
+            console.log('❌ Public API JSON parse failed:', parseError);
+            console.log('📄 Raw response preview:', jsonData.substring(0, 500));
           }
         } else {
-          console.log('❌ Empty API response');
+          console.log('❌ Empty public API response');
         }
       } else {
-        console.log('❌ Different API returned status:', response.status);
-        
-        // Try another completely different service
-        const altApiUrl = `https://api.vevioz.com/api/button/mp3/${videoId}`;
-        console.log('🔍 Trying completely different API:', altApiUrl);
-        
-        const altResponse = await fetch(altApiUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json,*/*',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-          }
-        });
-
-        console.log('📡 Alt API response status:', altResponse.status);
-
-        if (altResponse.ok) {
-          const altJsonData = await altResponse.text();
-          console.log('📄 Alt JSON response length:', altJsonData.length);
-          
-          if (altJsonData && altJsonData.trim().length > 0) {
-            try {
-              const altData = JSON.parse(altJsonData);
-              console.log('🔍 Alt API response:', altData);
-              
-              // Look for transcript in any field
-              if (altData.transcript || altData.subtitle || altData.caption) {
-                const transcript = (altData.transcript || altData.subtitle || altData.caption).trim();
-                if (transcript.length > 50) {
-                  console.log('✅ SUCCESS: Transcript found in alt API');
-                  return transcript.replace(/\s+/g, ' ').trim();
-                }
-              }
-            } catch (altParseError) {
-              console.log('❌ Alt JSON parse failed:', altParseError);
-            }
-          }
-        }
+        console.log('❌ Public yt-dlp API returned status:', response.status);
       }
     } catch (error) {
-      console.log('❌ Different API method failed:', error);
+      console.log('❌ yt-dlp method failed:', error);
     }
 
-    throw new Error('Different API method failed - no transcript found');
+    throw new Error('yt-dlp method failed - no auto-subs found');
   }
 
   // Parse XML captions
