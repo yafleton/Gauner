@@ -118,12 +118,17 @@ export default {
           }
         }
 
-        // If no format worked
+        // If no format worked, return debug info
         return new Response(JSON.stringify({
           success: false,
-          error: 'No transcript found for this video'
+          error: 'No transcript found for this video',
+          debug: {
+            videoId: videoId,
+            formats_tried: formats,
+            message: 'This video may not have auto-generated subtitles available'
+          }
         }), {
-          status: 404,
+          status: 200, // Return 200 instead of 404 to avoid frontend errors
           headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
@@ -145,6 +150,19 @@ export default {
       }
     }
 
-    return new Response('Not Found', { status: 404 });
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Invalid endpoint',
+      debug: {
+        pathname: url.pathname,
+        message: 'Use /api/transcript?video_id=VIDEO_ID'
+      }
+    }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
   },
 };
