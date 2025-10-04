@@ -88,132 +88,57 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // YT-DLP METHOD: Use yt-dlp for auto-subs extraction
+  // YT-DLP METHOD: Use Cloudflare Worker for yt-dlp auto-subs extraction
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 YT-DLP METHOD: Using yt-dlp for auto-subs extraction');
+    console.log('🎯 YT-DLP METHOD: Using Cloudflare Worker for auto-subs extraction');
     
     try {
-      // Try local yt-dlp server first
-      const localApiUrl = `http://localhost:3001/api/transcript/${videoId}`;
+      // Use Cloudflare Worker for yt-dlp transcript extraction
+      const workerUrl = `https://yt-dlp-transcript-worker.yafleton.workers.dev/api/transcript/${videoId}`;
       
-      console.log('🔍 Trying local yt-dlp server:', localApiUrl);
+      console.log('🔍 Using Cloudflare Worker:', workerUrl);
       
-      try {
-        const response = await fetch(localApiUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json,*/*'
-          }
-        });
-
-        console.log('📡 Local server response status:', response.status);
-
-        if (response.ok) {
-          const jsonData = await response.text();
-          console.log('📄 Local server response length:', jsonData.length);
-          
-          if (jsonData && jsonData.trim().length > 0) {
-            try {
-              const data = JSON.parse(jsonData);
-              console.log('🔍 Local server response:', data);
-              
-              if (data.transcript && data.transcript.length > 50) {
-                console.log('✅ SUCCESS: Auto-subs extracted via local yt-dlp server');
-                return data.transcript;
-              } else {
-                console.log('❌ Local server transcript too short:', data.transcript?.length || 0);
-              }
-            } catch (parseError) {
-              console.log('❌ Local server JSON parse failed:', parseError);
-            }
-          }
-        } else {
-          console.log('❌ Local yt-dlp server not available:', response.status);
-        }
-      } catch (localError) {
-        console.log('❌ Local yt-dlp server error:', localError);
-      }
-      
-      // Fallback to public yt-dlp service
-      const publicApiUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
-      
-      console.log('🔍 Fallback to public yt-dlp API:', publicApiUrl);
-      
-      const response = await fetch(publicApiUrl, {
+      const response = await fetch(workerUrl, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json,*/*',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'Accept': 'application/json,*/*'
         }
       });
 
-      console.log('📡 Public API response status:', response.status);
+      console.log('📡 Worker response status:', response.status);
 
       if (response.ok) {
         const jsonData = await response.text();
-        console.log('📄 Public API response length:', jsonData.length);
+        console.log('📄 Worker response length:', jsonData.length);
         
         if (jsonData && jsonData.trim().length > 0) {
           try {
             const data = JSON.parse(jsonData);
-            console.log('🔍 Public API response structure:', typeof data, Array.isArray(data) ? `Array(${data.length})` : Object.keys(data));
+            console.log('🔍 Worker response:', data);
             
-            // yt-dlp typically returns an array of transcript entries
-            let transcript = '';
-            
-            if (Array.isArray(data) && data.length > 0) {
-              // yt-dlp format: array of objects with text and duration
-              transcript = data
-                .map((entry: any) => {
-                  if (typeof entry === 'string') return entry;
-                  if (entry.text) return entry.text;
-                  if (entry.content) return entry.content;
-                  if (entry.transcript) return entry.transcript;
-                  return '';
-                })
-                .filter((text: string) => text.trim().length > 0)
-                .join(' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-            } else if (data.transcript && Array.isArray(data.transcript)) {
-              transcript = data.transcript
-                .map((entry: any) => {
-                  if (typeof entry === 'string') return entry;
-                  if (entry.text) return entry.text;
-                  if (entry.content) return entry.content;
-                  return '';
-                })
-                .filter((text: string) => text.trim().length > 0)
-                .join(' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-            } else if (data.text) {
-              transcript = data.text.trim();
-            } else if (data.content) {
-              transcript = data.content.trim();
-            }
-            
-            if (transcript.length > 50) {
-              console.log('✅ SUCCESS: Auto-subs extracted via public yt-dlp API');
-              return transcript;
+            if (data.transcript && data.transcript.length > 50) {
+              console.log('✅ SUCCESS: Auto-subs extracted via Cloudflare Worker');
+              return data.transcript;
             } else {
-              console.log('❌ Public API transcript too short:', transcript.length);
+              console.log('❌ Worker transcript too short:', data.transcript?.length || 0);
+              console.log('🔍 Worker error:', data.error || 'Unknown error');
             }
           } catch (parseError) {
-            console.log('❌ Public API JSON parse failed:', parseError);
-            console.log('📄 Raw response preview:', jsonData.substring(0, 500));
+            console.log('❌ Worker JSON parse failed:', parseError);
+            console.log('📄 Raw worker response:', jsonData);
           }
         } else {
-          console.log('❌ Empty public API response');
+          console.log('❌ Empty worker response');
         }
       } else {
-        console.log('❌ Public yt-dlp API returned status:', response.status);
+        const errorText = await response.text();
+        console.log('❌ Worker returned error:', response.status, errorText);
       }
     } catch (error) {
-      console.log('❌ yt-dlp method failed:', error);
+      console.log('❌ Cloudflare Worker method failed:', error);
     }
 
-    throw new Error('yt-dlp method failed - no auto-subs found');
+    throw new Error('Cloudflare Worker method failed - no auto-subs found');
   }
 
   // Parse XML captions
