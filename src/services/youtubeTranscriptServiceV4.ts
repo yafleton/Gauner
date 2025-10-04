@@ -88,21 +88,20 @@ export class YouTubeTranscriptServiceV4 {
     };
   }
 
-  // SIMPLE METHOD: Use YouTube's own transcript API directly
+  // NEW METHOD: Use public transcript API service
   private async getTranscriptSimple(videoId: string): Promise<string> {
-    console.log('🎯 SIMPLE METHOD: Using YouTube\'s own transcript API');
+    console.log('🎯 NEW METHOD: Using public transcript API service');
     
     try {
-      // Try YouTube's own transcript API - this should work
-      const transcriptUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`;
+      // Try a different public API service
+      const apiUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
       
-      console.log('🔍 Calling YouTube transcript API:', transcriptUrl);
+      console.log('🔍 Calling public transcript API:', apiUrl);
       
-      const response = await fetch(transcriptUrl, {
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'Accept': 'application/json'
         }
       });
 
@@ -112,69 +111,44 @@ export class YouTubeTranscriptServiceV4 {
         const responseData = await response.json();
         console.log('📄 Response data:', responseData);
 
-        // Extract transcript from YouTube's response
+        // Extract transcript from response
         let transcript = '';
         
-        if (responseData && responseData.events) {
-          // YouTube's json3 format
-          const textParts = responseData.events
-            .filter((event: any) => event.segs && event.segs.length > 0)
-            .map((event: any) => 
-              event.segs.map((seg: any) => seg.utf8 || '').join('')
-            )
+        if (Array.isArray(responseData)) {
+          // Array format: [{text: "...", start: 0, duration: 5}, ...]
+          transcript = responseData
+            .map((item: any) => item.text || item.transcript || '')
             .join(' ')
             .trim();
-          
-          transcript = textParts;
+        } else if (responseData && typeof responseData === 'object') {
+          // Object format
+          if (responseData.transcript) {
+            transcript = responseData.transcript;
+          } else if (responseData.text) {
+            transcript = responseData.text;
+          } else if (responseData.segments && Array.isArray(responseData.segments)) {
+            transcript = responseData.segments
+              .map((seg: any) => seg.text || seg.content || '')
+              .join(' ')
+              .trim();
+          }
+        } else if (typeof responseData === 'string') {
+          transcript = responseData;
         }
 
         if (transcript && transcript.length > 10) {
-          console.log('✅ SUCCESS: YouTube transcript API worked');
+          console.log('✅ SUCCESS: Public transcript API worked');
           console.log('📄 Transcript length:', transcript.length);
           console.log('📄 Transcript preview:', transcript.substring(0, 200));
           return transcript;
         }
       }
 
-      // If that didn't work, try without kind=asr
-      console.log('🔄 Trying without kind=asr...');
-      const fallbackUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`;
-      
-      const fallbackResponse = await fetch(fallbackUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-
-      if (fallbackResponse.ok) {
-        const fallbackData = await fallbackResponse.json();
-        console.log('📄 Fallback response data:', fallbackData);
-
-        if (fallbackData && fallbackData.events) {
-          const textParts = fallbackData.events
-            .filter((event: any) => event.segs && event.segs.length > 0)
-            .map((event: any) => 
-              event.segs.map((seg: any) => seg.utf8 || '').join('')
-            )
-            .join(' ')
-            .trim();
-          
-          if (textParts && textParts.length > 10) {
-            console.log('✅ SUCCESS: Fallback YouTube transcript API worked');
-            console.log('📄 Transcript length:', textParts.length);
-            console.log('📄 Transcript preview:', textParts.substring(0, 200));
-            return textParts;
-          }
-        }
-      }
-
-      console.log('❌ YouTube transcript API failed');
-      return `DEBUG: YouTube transcript API failed for ${videoId}. Status: ${response.status}`;
+      console.log('❌ Public transcript API failed');
+      return `DEBUG: Public transcript API failed for ${videoId}. Status: ${response.status}`;
 
     } catch (error) {
-      console.log('❌ YouTube transcript API error:', error);
+      console.log('❌ Public transcript API error:', error);
       return `DEBUG: Network error - ${error}`;
     }
   }
