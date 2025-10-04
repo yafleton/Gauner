@@ -88,43 +88,73 @@ export class YouTubeTranscriptServiceV4 {
     };
   }
 
-  // WORKING METHOD: Use simple mock transcript for testing
+  // WORKING METHOD: Use free transcript API service
   private async getTranscriptSimple(videoId: string): Promise<string> {
-    console.log('🎯 WORKING METHOD: Using mock transcript for testing');
+    console.log('🎯 WORKING METHOD: Using free transcript API service');
     
     try {
-      // For now, return a mock transcript to test the system
-      // This allows us to verify that the rest of the pipeline works
-      const mockTranscript = `This is a mock transcript for video ${videoId}. 
+      // Use a free transcript API service that should work
+      const apiUrl = `https://api.vevioz.com/api/button/mp3/${videoId}`;
       
-The system is currently working correctly, but we need to find a working transcript extraction method that doesn't have CORS issues.
-
-This mock transcript contains multiple sentences to test the full pipeline including:
-- Transcript extraction
-- Text cleaning
-- Translation (when enabled)
-- Audio generation
-- Google Drive upload
-
-The video title was successfully extracted, which means the basic YouTube integration is working. We just need to find a reliable way to get the actual transcript content without CORS restrictions.
-
-Some potential solutions include:
-1. Server-side transcript extraction
-2. Browser extension approach
-3. Different API endpoints
-4. Alternative transcript services
-
-For now, this mock transcript allows us to test and verify that all other parts of the system are functioning correctly.`;
-
-      console.log('✅ SUCCESS: Mock transcript generated');
-      console.log('📄 Transcript length:', mockTranscript.length);
-      console.log('📄 Transcript preview:', mockTranscript.substring(0, 200));
+      console.log('🔍 Calling free transcript API:', apiUrl);
       
-      return mockTranscript;
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      console.log('📡 Response status:', response.status);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('📄 Response data:', responseData);
+
+        // Extract transcript from response
+        let transcript = '';
+        
+        if (Array.isArray(responseData)) {
+          // Array format: [{text: "...", start: 0, duration: 5}, ...]
+          transcript = responseData
+            .map((item: any) => item.text || item.transcript || item.content || '')
+            .join(' ')
+            .trim();
+        } else if (responseData && typeof responseData === 'object') {
+          // Object format
+          if (responseData.transcript) {
+            transcript = responseData.transcript;
+          } else if (responseData.text) {
+            transcript = responseData.text;
+          } else if (responseData.content) {
+            transcript = responseData.content;
+          } else if (responseData.segments && Array.isArray(responseData.segments)) {
+            transcript = responseData.segments
+              .map((seg: any) => seg.text || seg.content || seg.transcript || '')
+              .join(' ')
+              .trim();
+          }
+        } else if (typeof responseData === 'string') {
+          transcript = responseData;
+        }
+
+        if (transcript && transcript.length > 10) {
+          console.log('✅ SUCCESS: Free transcript API worked');
+          console.log('📄 Transcript length:', transcript.length);
+          console.log('📄 Transcript preview:', transcript.substring(0, 200));
+          return transcript;
+        } else {
+          console.log('❌ No transcript found in response');
+          return `DEBUG: No transcript found in free API response for ${videoId}. Response: ${JSON.stringify(responseData).substring(0, 200)}`;
+        }
+      }
+
+      console.log('❌ Free transcript API failed');
+      return `DEBUG: Free transcript API failed for ${videoId}. Status: ${response.status}`;
 
     } catch (error) {
-      console.log('❌ Mock transcript method error:', error);
-      return `DEBUG: Mock transcript error - ${error}`;
+      console.log('❌ Free transcript API error:', error);
+      return `DEBUG: Network error - ${error}`;
     }
   }
 
