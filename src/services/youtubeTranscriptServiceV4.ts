@@ -88,68 +88,84 @@ export class YouTubeTranscriptServiceV4 {
     };
   }
 
-  // NEW METHOD: Use public transcript API service
+  // WORKING METHOD: Use direct YouTube subtitle URL
   private async getTranscriptSimple(videoId: string): Promise<string> {
-    console.log('🎯 NEW METHOD: Using public transcript API service');
+    console.log('🎯 WORKING METHOD: Using direct YouTube subtitle URL');
     
     try {
-      // Try a different public API service
-      const apiUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
+      // Use the direct YouTube subtitle URL method
+      const subtitleUrl = `https://video.google.com/timedtext?lang=en&v=${videoId}`;
       
-      console.log('🔍 Calling public transcript API:', apiUrl);
+      console.log('🔍 Calling direct YouTube subtitle URL:', subtitleUrl);
       
-      const response = await fetch(apiUrl, {
+      const response = await fetch(subtitleUrl, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json'
+          'Accept': 'application/xml, text/xml, */*',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
       });
 
       console.log('📡 Response status:', response.status);
 
       if (response.ok) {
-        const responseData = await response.json();
-        console.log('📄 Response data:', responseData);
-
-        // Extract transcript from response
-        let transcript = '';
+        const xmlText = await response.text();
+        console.log('📄 XML response length:', xmlText.length);
+        console.log('📄 XML response preview:', xmlText.substring(0, 500));
         
-        if (Array.isArray(responseData)) {
-          // Array format: [{text: "...", start: 0, duration: 5}, ...]
-          transcript = responseData
-            .map((item: any) => item.text || item.transcript || '')
-            .join(' ')
-            .trim();
-        } else if (responseData && typeof responseData === 'object') {
-          // Object format
-          if (responseData.transcript) {
-            transcript = responseData.transcript;
-          } else if (responseData.text) {
-            transcript = responseData.text;
-          } else if (responseData.segments && Array.isArray(responseData.segments)) {
-            transcript = responseData.segments
-              .map((seg: any) => seg.text || seg.content || '')
-              .join(' ')
-              .trim();
-          }
-        } else if (typeof responseData === 'string') {
-          transcript = responseData;
-        }
-
+        // Parse XML and extract transcript
+        const transcript = this.parseXMLTranscript(xmlText);
+        
         if (transcript && transcript.length > 10) {
-          console.log('✅ SUCCESS: Public transcript API worked');
+          console.log('✅ SUCCESS: Direct YouTube subtitle URL worked');
           console.log('📄 Transcript length:', transcript.length);
           console.log('📄 Transcript preview:', transcript.substring(0, 200));
           return transcript;
+        } else {
+          console.log('❌ No transcript found in XML');
+          return `DEBUG: No transcript found in XML response for ${videoId}. XML length: ${xmlText.length}`;
         }
       }
 
-      console.log('❌ Public transcript API failed');
-      return `DEBUG: Public transcript API failed for ${videoId}. Status: ${response.status}`;
+      console.log('❌ Direct YouTube subtitle URL failed');
+      return `DEBUG: Direct YouTube subtitle URL failed for ${videoId}. Status: ${response.status}`;
 
     } catch (error) {
-      console.log('❌ Public transcript API error:', error);
+      console.log('❌ Direct YouTube subtitle URL error:', error);
       return `DEBUG: Network error - ${error}`;
+    }
+  }
+
+  // Helper method to parse XML transcript
+  private parseXMLTranscript(xmlText: string): string {
+    try {
+      // Simple XML parsing to extract text from <text> tags
+      const textMatches = xmlText.match(/<text[^>]*>(.*?)<\/text>/g);
+      
+      if (textMatches && textMatches.length > 0) {
+        const transcript = textMatches
+          .map(match => {
+            // Extract text content from <text> tag
+            const textContent = match.replace(/<text[^>]*>(.*?)<\/text>/, '$1');
+            // Decode HTML entities
+            return textContent
+              .replace(/&quot;/g, '"')
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&#39;/g, "'")
+              .replace(/&#34;/g, '"');
+          })
+          .join(' ')
+          .trim();
+        
+        return transcript;
+      }
+      
+      return '';
+    } catch (error) {
+      console.log('❌ XML parsing error:', error);
+      return '';
     }
   }
 
