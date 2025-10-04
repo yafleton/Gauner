@@ -88,29 +88,25 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // YOUTUBE SCRAPING METHOD: Direct YouTube page scraping for captions
+  // CORS PROXY METHOD: Use CORS proxy to bypass YouTube blocking
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 YOUTUBE SCRAPING METHOD: Direct YouTube page scraping for captions');
+    console.log('🎯 CORS PROXY METHOD: Using CORS proxy to bypass YouTube blocking');
     
     try {
-      // Step 1: Get the YouTube video page
+      // Step 1: Get the YouTube video page via CORS proxy
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      console.log('🔍 Fetching YouTube page:', videoUrl);
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(videoUrl)}`;
       
-      const pageResponse = await fetch(videoUrl, {
+      console.log('🔍 Fetching YouTube page via CORS proxy:', proxyUrl);
+      
+      const pageResponse = await fetch(proxyUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'DNT': '1',
-          'Connection': 'keep-alive',
-          'Upgrade-Insecure-Requests': '1'
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
         }
       });
 
       if (!pageResponse.ok) {
-        throw new Error(`Failed to fetch YouTube page: ${pageResponse.status}`);
+        throw new Error(`Failed to fetch YouTube page via proxy: ${pageResponse.status}`);
       }
 
       const pageHtml = await pageResponse.text();
@@ -179,18 +175,16 @@ export class YouTubeTranscriptServiceV3 {
         baseUrl: selectedTrack?.baseUrl?.substring(0, 100) + '...'
       });
 
-      // Step 5: Fetch the caption XML
+      // Step 5: Fetch the caption XML via CORS proxy
       const captionUrl = selectedTrack.baseUrl;
-      console.log('🔍 Fetching caption XML:', captionUrl.substring(0, 100) + '...');
+      const captionProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(captionUrl)}`;
+      
+      console.log('🔍 Fetching caption XML via CORS proxy:', captionProxyUrl.substring(0, 100) + '...');
 
-      const captionResponse = await fetch(captionUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-      });
+      const captionResponse = await fetch(captionProxyUrl);
 
       if (!captionResponse.ok) {
-        throw new Error(`Failed to fetch captions: ${captionResponse.status}`);
+        throw new Error(`Failed to fetch captions via proxy: ${captionResponse.status}`);
       }
 
       const captionXml = await captionResponse.text();
@@ -200,15 +194,82 @@ export class YouTubeTranscriptServiceV3 {
       const transcript = this.parseCaptionXml(captionXml);
       
       if (transcript.length > 50) {
-        console.log('✅ SUCCESS: Transcript extracted via YouTube scraping method');
+        console.log('✅ SUCCESS: Transcript extracted via CORS proxy method');
         return transcript;
       } else {
         throw new Error('Transcript too short after parsing');
       }
 
     } catch (error) {
-      console.log('❌ YouTube scraping method failed:', error);
-      throw new Error(`YouTube scraping method failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.log('❌ CORS proxy method failed:', error);
+      
+      // Fallback: Try alternative CORS proxy
+      try {
+        console.log('🔄 Trying alternative CORS proxy...');
+        return await this.tryAlternativeProxy(videoId);
+      } catch (fallbackError) {
+        console.log('❌ Alternative proxy also failed:', fallbackError);
+        throw new Error(`CORS proxy method failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+  }
+
+  // Alternative CORS proxy method
+  private async tryAlternativeProxy(videoId: string): Promise<string> {
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const proxyUrl = `https://cors-anywhere.herokuapp.com/${videoUrl}`;
+    
+    console.log('🔍 Trying alternative CORS proxy:', proxyUrl);
+    
+    const pageResponse = await fetch(proxyUrl, {
+      headers: {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+      }
+    });
+
+    if (!pageResponse.ok) {
+      throw new Error(`Alternative proxy failed: ${pageResponse.status}`);
+    }
+
+    const pageHtml = await pageResponse.text();
+    console.log('📄 Alternative proxy page HTML length:', pageHtml.length);
+
+    // Extract and process the same way
+    const playerResponseMatch = pageHtml.match(/var ytInitialPlayerResponse = ({.+?});/);
+    if (!playerResponseMatch) {
+      throw new Error('Could not find ytInitialPlayerResponse in alternative proxy response');
+    }
+
+    const playerResponse = JSON.parse(playerResponseMatch[1]);
+    const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+    
+    if (!captionTracks || !Array.isArray(captionTracks)) {
+      throw new Error('No caption tracks found in alternative proxy response');
+    }
+
+    let selectedTrack = captionTracks.find((track: any) => 
+      track?.languageCode === 'en' && track?.kind === 'asr'
+    ) || captionTracks.find((track: any) => track?.languageCode === 'en') || captionTracks[0];
+
+    if (!selectedTrack?.baseUrl) {
+      throw new Error('No suitable caption track found in alternative proxy');
+    }
+
+    const captionProxyUrl = `https://cors-anywhere.herokuapp.com/${selectedTrack.baseUrl}`;
+    const captionResponse = await fetch(captionProxyUrl);
+    
+    if (!captionResponse.ok) {
+      throw new Error(`Failed to fetch captions via alternative proxy: ${captionResponse.status}`);
+    }
+
+    const captionXml = await captionResponse.text();
+    const transcript = this.parseCaptionXml(captionXml);
+    
+    if (transcript.length > 50) {
+      console.log('✅ SUCCESS: Transcript extracted via alternative CORS proxy');
+      return transcript;
+    } else {
+      throw new Error('Transcript too short after alternative proxy parsing');
     }
   }
 
