@@ -88,47 +88,87 @@ export class YouTubeTranscriptServiceV4 {
     };
   }
 
-  // WORKING METHOD: Use improved Cloudflare Worker backend
+  // WORKING METHOD: Use public transcript API service
   private async getTranscriptSimple(videoId: string): Promise<string> {
-    console.log('🎯 WORKING METHOD: Using improved Cloudflare Worker backend');
+    console.log('🎯 WORKING METHOD: Using public transcript API service');
     
     try {
-      // Use improved Cloudflare Worker with more URL variations
-      const workerUrl = 'https://youtube-transcript-worker.danielfahmy02.workers.dev/api/transcript';
-      const apiUrl = `${workerUrl}?video_id=${videoId}`;
-      
-      console.log('🔍 Calling improved Cloudflare Worker:', apiUrl);
-      
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
+      // Try multiple public transcript APIs
+      const apis = [
+        `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`,
+        `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`,
+        `https://api.vevioz.com/api/button/mp3/${videoId}`,
+        `https://youtube-transcript-api.netlify.app/api/transcript?video_id=${videoId}`,
+        `https://youtube-transcript-api.railway.app/api/transcript?video_id=${videoId}`
+      ];
 
-      console.log('📡 Response status:', response.status);
+      for (let i = 0; i < apis.length; i++) {
+        const apiUrl = apis[i];
+        console.log(`🔍 Trying public API ${i + 1}/${apis.length}:`, apiUrl);
+        
+        try {
+          const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
 
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log('📄 Response data:', responseData);
+          console.log(`📡 Response status for API ${i + 1}:`, response.status);
 
-        if (responseData.success && responseData.transcript) {
-          console.log('✅ SUCCESS: Improved Cloudflare Worker method worked');
-          console.log('📄 Transcript length:', responseData.length);
-          console.log('📄 Transcript preview:', responseData.transcript.substring(0, 200));
-          return responseData.transcript;
-        } else {
-          console.log('❌ No transcript found in response');
-          console.log('📄 Debug info:', responseData.debug);
-          return `DEBUG: No transcript found in improved Worker response for ${videoId}. Response: ${JSON.stringify(responseData)}`;
+          if (response.ok) {
+            const responseData = await response.json();
+            console.log(`📄 Response data for API ${i + 1}:`, responseData);
+
+            // Extract transcript from response
+            let transcript = '';
+            
+            if (Array.isArray(responseData)) {
+              // Array format: [{text: "...", start: 0, duration: 5}, ...]
+              transcript = responseData
+                .map((item: any) => item.text || item.transcript || item.content || '')
+                .join(' ')
+                .trim();
+            } else if (responseData && typeof responseData === 'object') {
+              // Object format
+              if (responseData.transcript) {
+                transcript = responseData.transcript;
+              } else if (responseData.text) {
+                transcript = responseData.text;
+              } else if (responseData.content) {
+                transcript = responseData.content;
+              } else if (responseData.segments && Array.isArray(responseData.segments)) {
+                transcript = responseData.segments
+                  .map((seg: any) => seg.text || seg.content || seg.transcript || '')
+                  .join(' ')
+                  .trim();
+              }
+            } else if (typeof responseData === 'string') {
+              transcript = responseData;
+            }
+
+            if (transcript && transcript.length > 10) {
+              console.log(`✅ SUCCESS: Public API ${i + 1} worked`);
+              console.log('📄 Transcript length:', transcript.length);
+              console.log('📄 Transcript preview:', transcript.substring(0, 200));
+              return transcript;
+            } else {
+              console.log(`❌ API ${i + 1} returned no transcript`);
+            }
+          } else {
+            console.log(`❌ API ${i + 1} failed with status:`, response.status);
+          }
+        } catch (error) {
+          console.log(`❌ API ${i + 1} error:`, error);
+          continue;
         }
       }
 
-      console.log('❌ Improved Cloudflare Worker method failed');
-      return `DEBUG: Improved Cloudflare Worker method failed for ${videoId}. Status: ${response.status}`;
+      console.log('❌ All public APIs failed');
+      return `DEBUG: All public transcript APIs failed for ${videoId}. Tried ${apis.length} different services.`;
 
     } catch (error) {
-      console.log('❌ Improved Cloudflare Worker method error:', error);
+      console.log('❌ Public API method error:', error);
       return `DEBUG: Network error - ${error}`;
     }
   }
