@@ -88,45 +88,47 @@ export class YouTubeTranscriptServiceV4 {
     };
   }
 
-  // WORKING METHOD: Use simple mock transcript for now
+  // WORKING METHOD: Use deployed Cloudflare Worker backend
   private async getTranscriptSimple(videoId: string): Promise<string> {
-    console.log('🎯 WORKING METHOD: Using mock transcript (Cloudflare Worker needs API token)');
+    console.log('🎯 WORKING METHOD: Using deployed Cloudflare Worker backend');
     
     try {
-      // Return a realistic mock transcript for testing
-      const mockTranscript = `This is a test transcript for the YouTube video with ID ${videoId}.
-
-The transcript extraction system is working correctly, but we need to deploy the Cloudflare Worker to get real transcripts.
-
-Currently, the system can:
-- Extract video IDs from YouTube URLs ✅
-- Fetch video titles and channel names ✅
-- Clean and process text ✅
-- Generate audio with Azure TTS ✅
-- Upload to Google Drive ✅
-
-The only missing piece is the transcript extraction, which requires:
-1. Creating a Cloudflare API token
-2. Deploying the Worker with: npx wrangler deploy --config wrangler-transcript.toml --env=""
-3. Setting CLOUDFLARE_API_TOKEN environment variable
-
-Once the Worker is deployed, it will:
-- Fetch real transcripts from YouTube's API
-- Parse multiple formats (json3, srv3, ttml, vtt)
-- Return clean transcript text
-- Bypass all CORS restrictions
-
-This mock transcript allows us to test the complete pipeline while we set up the backend infrastructure.`;
-
-      console.log('✅ SUCCESS: Mock transcript generated');
-      console.log('📄 Transcript length:', mockTranscript.length);
-      console.log('📄 Transcript preview:', mockTranscript.substring(0, 200));
+      // Use deployed Cloudflare Worker to bypass CORS
+      const workerUrl = 'https://youtube-transcript-worker.danielfahmy02.workers.dev/api/transcript';
+      const apiUrl = `${workerUrl}?video_id=${videoId}`;
       
-      return mockTranscript;
+      console.log('🔍 Calling deployed Cloudflare Worker:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      console.log('📡 Response status:', response.status);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('📄 Response data:', responseData);
+
+        if (responseData.success && responseData.transcript) {
+          console.log('✅ SUCCESS: Deployed Cloudflare Worker method worked');
+          console.log('📄 Transcript length:', responseData.length);
+          console.log('📄 Transcript preview:', responseData.transcript.substring(0, 200));
+          return responseData.transcript;
+        } else {
+          console.log('❌ No transcript found in response');
+          return `DEBUG: No transcript found in deployed Worker response for ${videoId}. Response: ${JSON.stringify(responseData)}`;
+        }
+      }
+
+      console.log('❌ Deployed Cloudflare Worker method failed');
+      return `DEBUG: Deployed Cloudflare Worker method failed for ${videoId}. Status: ${response.status}`;
 
     } catch (error) {
-      console.log('❌ Mock transcript method error:', error);
-      return `DEBUG: Mock transcript error - ${error}`;
+      console.log('❌ Deployed Cloudflare Worker method error:', error);
+      return `DEBUG: Network error - ${error}`;
     }
   }
 
