@@ -145,6 +145,27 @@ export class YouTubeTranscriptServiceV3 {
     try {
       console.log('🔍 Extracting transcript from HTML response...');
       
+      // First, try to find the actual transcript content before UI elements
+      const transcriptPatterns = [
+        // Look for content that looks like actual transcript (sentences with quotes)
+        /(".*?")/g,
+        // Look for content after "Transcript" but before UI elements
+        /(?:transcript|transcript of)[\s\S]*?([^<>]*"[^"]*"[^<>]*)/i,
+        // Look for content in paragraphs that contain dialogue
+        /<p[^>]*>([^<>]*"[^"]*"[^<>]*)<\/p>/gi
+      ];
+      
+      for (const pattern of transcriptPatterns) {
+        const matches = html.match(pattern);
+        if (matches) {
+          const transcriptContent = matches.join(' ').trim();
+          if (transcriptContent.length > 100) {
+            console.log('✅ Found transcript-like content');
+            return this.cleanTranscriptText(transcriptContent);
+          }
+        }
+      }
+      
       // Look for transcript content in common containers
       const patterns = [
         // Look for textarea content (most common)
@@ -172,13 +193,14 @@ export class YouTubeTranscriptServiceV3 {
             .replace(/&gt;/g, '>')
             .replace(/&quot;/g, '"')
             .replace(/&#39;/g, "'")
+            .replace(/&#34;/g, '"') // Fix HTML entity for quotes
             .replace(/&nbsp;/g, ' ')
             .replace(/\s+/g, ' ') // Normalize whitespace
             .trim();
           
           if (cleanText.length > 50) {
             console.log(`✅ Found transcript in HTML (${cleanText.length} chars)`);
-            return cleanText;
+            return this.cleanTranscriptText(cleanText);
           }
         }
       }
@@ -202,7 +224,13 @@ export class YouTubeTranscriptServiceV3 {
         .replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
+        .replace(/&#34;/g, '"') // Fix HTML entity for quotes
+        .replace(/&#x27;/g, "'") // Hex entity for apostrophe
+        .replace(/&#x22;/g, '"') // Hex entity for quote
         .replace(/&nbsp;/g, ' ')
+        .replace(/&hellip;/g, '...') // Ellipsis
+        .replace(/&mdash;/g, '—') // Em dash
+        .replace(/&ndash;/g, '–') // En dash
         .replace(/\s+/g, ' ') // Normalize whitespace
         .trim();
       
@@ -219,6 +247,24 @@ export class YouTubeTranscriptServiceV3 {
         !line.toLowerCase().includes('error') &&
         !line.toLowerCase().includes('youtube') &&
         !line.toLowerCase().includes('transcript') &&
+        !line.toLowerCase().includes('author:') &&
+        !line.toLowerCase().includes('like') &&
+        !line.toLowerCase().includes('subscribe') &&
+        !line.toLowerCase().includes('share') &&
+        !line.toLowerCase().includes('translate') &&
+        !line.toLowerCase().includes('ai translate') &&
+        !line.toLowerCase().includes('target language') &&
+        !line.toLowerCase().includes('select a language') &&
+        !line.toLowerCase().includes('translation completed') &&
+        !line.toLowerCase().includes('copy timestamp') &&
+        !line.toLowerCase().includes('show translation') &&
+        !line.toLowerCase().includes('show original') &&
+        !line.toLowerCase().includes('translation failed') &&
+        !line.toLowerCase().includes('pin video') &&
+        !line.toLowerCase().includes('&midot;') &&
+        !line.match(/^\d+$/) && // Not just numbers
+        !line.match(/^[0-9\s\-.]+$/) && // Not just numbers and symbols
+        !line.match(/^[^a-zA-Z]*$/) && // Must contain letters
         line.includes(' ') // Must have spaces (multiple words)
       );
       
@@ -226,7 +272,7 @@ export class YouTubeTranscriptServiceV3 {
         const transcript = meaningfulLines.join('. ').trim();
         if (transcript.length > 50) {
           console.log(`✅ Extracted meaningful text (${transcript.length} chars)`);
-          return transcript;
+          return this.cleanTranscriptText(transcript);
         }
       }
       
@@ -235,6 +281,53 @@ export class YouTubeTranscriptServiceV3 {
     }
     
     throw new Error('Could not extract transcript from HTML response');
+  }
+
+  // Clean and format transcript text
+  private cleanTranscriptText(text: string): string {
+    console.log('🧹 Cleaning transcript text...');
+    
+    return text
+      // Fix common HTML entities
+      .replace(/&#34;/g, '"') // HTML entity for quotes
+      .replace(/&#39;/g, "'") // HTML entity for apostrophe
+      .replace(/&#x27;/g, "'") // Hex entity for apostrophe
+      .replace(/&#x22;/g, '"') // Hex entity for quote
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&hellip;/g, '...')
+      .replace(/&mdash;/g, '—')
+      .replace(/&ndash;/g, '–')
+      
+      // Remove UI elements and metadata
+      .replace(/Author:\s*[^•]+•/gi, '')
+      .replace(/Like\s*•/gi, '')
+      .replace(/Subscribe\s*•/gi, '')
+      .replace(/Share\s*/gi, '')
+      .replace(/Transcript\s*Pin\s*video/gi, '')
+      .replace(/AI\s*Translate\s*Transcript/gi, '')
+      .replace(/Translate\s*this\s*transcript/gi, '')
+      .replace(/Target\s*Language/gi, '')
+      .replace(/Select\s*a\s*language/gi, '')
+      .replace(/Translation\s*completed/gi, '')
+      .replace(/Show\s*Translation/gi, '')
+      .replace(/Show\s*Original/gi, '')
+      .replace(/Translation\s*failed/gi, '')
+      .replace(/Copy\s*Timestamp/gi, '')
+      .replace(/&midot;/g, '')
+      
+      // Remove standalone numbers and symbols
+      .replace(/^\d+$/gm, '')
+      .replace(/^[0-9\s\-.]+$/gm, '')
+      .replace(/^[^a-zA-Z]*$/gm, '')
+      
+      // Normalize whitespace
+      .replace(/\s+/g, ' ')
+      .replace(/\n\s*\n/g, '\n')
+      .trim();
   }
 
   // Parse JSON transcript format
