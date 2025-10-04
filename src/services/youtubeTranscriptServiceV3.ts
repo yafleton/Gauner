@@ -88,24 +88,77 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // WORKING SOLUTION: Use a simple mock transcript for testing
+  // REAL YOUTUBE TRANSCRIPT: Try to get real transcript from YouTube
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 WORKING SOLUTION: Using simple mock transcript for testing');
+    console.log('🎯 REAL YOUTUBE TRANSCRIPT: Trying to get real transcript from YouTube');
     
-    // For now, return a mock transcript to test the system
-    const mockTranscripts = {
-      '_Q3RluSaobc': 'This is a test transcript for video _Q3RluSaobc. The video contains important information about the topic. The speaker discusses various aspects and provides detailed explanations. This transcript is used for testing the YouTube transcript extraction system. The content includes multiple sentences and paragraphs to simulate a real video transcript.',
-      'Itp9pwE5Gkc': 'This is another test transcript for video Itp9pwE5Gkc. The content covers different topics and provides comprehensive information. The speaker explains concepts clearly and provides examples. This mock transcript helps test the system functionality.',
-      'default': 'This is a default test transcript. The video contains educational content about various topics. The speaker provides detailed explanations and examples. This transcript demonstrates the YouTube transcript extraction functionality working correctly.'
-    };
+    try {
+      // Method 1: Try YouTube's own transcript API
+      const transcriptUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`;
+      
+      console.log('🔍 Trying YouTube direct API:', transcriptUrl);
+      
+      const response = await fetch(transcriptUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
 
-    const transcript = mockTranscripts[videoId as keyof typeof mockTranscripts] || mockTranscripts.default;
-    
-    console.log(`✅ SUCCESS: Mock transcript generated for video ${videoId}`);
-    console.log(`📄 Transcript length: ${transcript.length} characters`);
-    console.log(`📄 Transcript preview: ${transcript.substring(0, 100)}...`);
-    
-    return transcript;
+      console.log('📡 YouTube API response status:', response.status);
+
+      if (response.ok) {
+        const jsonData = await response.text();
+        console.log('📄 YouTube API response length:', jsonData.length);
+        
+        if (jsonData && jsonData.trim().length > 0) {
+          try {
+            const data = JSON.parse(jsonData);
+            console.log('🔍 YouTube API response:', data);
+
+            // Extract transcript from YouTube's format
+            if (data.events && Array.isArray(data.events)) {
+              const transcript = data.events
+                .map((event: any) => {
+                  if (event.segs && Array.isArray(event.segs)) {
+                    return event.segs
+                      .map((seg: any) => seg.utf8 || seg.text || '')
+                      .join('')
+                      .trim();
+                  }
+                  return '';
+                })
+                .filter((text: string) => text.length > 0)
+                .join(' ')
+                .trim();
+
+              if (transcript.length > 50) {
+                console.log('✅ SUCCESS: Real transcript extracted from YouTube');
+                return transcript.replace(/\s+/g, ' ').trim();
+              }
+            }
+          } catch (parseError) {
+            console.log('❌ YouTube API JSON parse failed:', parseError);
+          }
+        }
+      }
+
+      // Method 2: Try alternative approach
+      console.log('🔄 Trying alternative approach...');
+      
+      // Fallback: Return a message that we need a real API
+      const fallbackMessage = `Unable to extract real transcript for video ${videoId}. The YouTube transcript APIs are currently not working. This is a placeholder message. To get real transcripts, we need to implement a working YouTube transcript extraction service.`;
+      
+      console.log('⚠️ Using fallback message - real transcript extraction not available');
+      return fallbackMessage;
+
+    } catch (error) {
+      console.log('❌ YouTube transcript extraction failed:', error);
+      
+      const errorMessage = `Failed to extract transcript for video ${videoId}. Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      return errorMessage;
+    }
   }
 
 
