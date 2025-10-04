@@ -152,32 +152,24 @@ export class YouTubeTranscriptServiceV3 {
         } else {
           console.log('❌ API returned empty or invalid transcript');
           console.log('📄 Raw response:', JSON.stringify(responseData, null, 2));
-          return this.getFallbackMessage(videoId);
+          return `DEBUG: API returned empty/invalid transcript for ${videoId}. Raw response: ${JSON.stringify(responseData, null, 2)}`;
         }
       } else {
         console.log('❌ API request failed:', response.status);
         const errorText = await response.text().catch(() => 'Unknown error');
         console.log('❌ Error response:', errorText);
-        return this.getFallbackMessage(videoId);
+        return `DEBUG: HTTP ${response.status} - ${errorText}`;
       }
 
     } catch (error) {
       console.log('❌ youtube-transcript.io API error:', error);
-      return this.getFallbackMessage(videoId);
+      return `DEBUG: Network error - ${error}`;
     }
   }
 
-  // Fallback method - return informative message
+  // Fallback method - return informative message (not used anymore, keeping for compatibility)
   private getFallbackMessage(videoId: string): string {
-    return `Transcript extraction failed for video ${videoId}. 
-
-The youtube-transcript.io API might be:
-❌ Temporarily unavailable
-❌ Requiring authentication
-❌ Being blocked by CORS
-❌ Video has no available transcripts
-
-Try again later, or use the Voice tab to manually add your text.`;
+    return `DEBUG: Fallback message for ${videoId} - This should not appear anymore`;
   }
 
   // Validate YouTube URL
