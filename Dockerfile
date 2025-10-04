@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 10000
 
 # Start the application
-CMD python -m uvicorn api:app --host 0.0.0.0 --port ${PORT:-10000}
+CMD ["sh", "-c", "python -m uvicorn api:app --host 0.0.0.0 --port $PORT"]
