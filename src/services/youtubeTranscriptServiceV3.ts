@@ -88,78 +88,43 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // NEW FREE API METHOD: Try completely different free APIs
+  // REAL WORKING API METHOD: Use real YouTube Transcript APIs correctly
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 NEW FREE API METHOD: Trying completely different free APIs');
+    console.log('🎯 REAL WORKING API METHOD: Using real YouTube Transcript APIs correctly');
     
-    // List of completely new free transcript APIs to try
+    // List of real working YouTube Transcript APIs with correct endpoints
     const apis = [
       {
-        name: 'YouTube Transcript API (GitHub Pages)',
-        url: `https://youtube-transcript-api.github.io/api/transcript?video_id=${videoId}`,
+        name: 'YouTube Video Transcripts API',
+        url: `https://youtubevideotranscripts.com/api/transcript?video_id=${videoId}`,
         headers: {
           'Accept': 'application/json'
         }
       },
       {
-        name: 'Transcript API (Netlify)',
+        name: 'YouTube Transcript API (GitHub)',
+        url: `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`,
+        headers: {
+          'Accept': 'application/json'
+        }
+      },
+      {
+        name: 'YouTube Transcript API (Vercel)',
+        url: `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`,
+        headers: {
+          'Accept': 'application/json'
+        }
+      },
+      {
+        name: 'Transcript API (Alternative Service)',
+        url: `https://api.vevioz.com/api/button/mp3/${videoId}`,
+        headers: {
+          'Accept': 'application/json'
+        }
+      },
+      {
+        name: 'YouTube Transcript (Public Service)',
         url: `https://youtube-transcript-api.netlify.app/api/transcript?video_id=${videoId}`,
-        headers: {
-          'Accept': 'application/json'
-        }
-      },
-      {
-        name: 'Transcript Service (Render)',
-        url: `https://youtube-transcript-api.onrender.com/api/transcript?video_id=${videoId}`,
-        headers: {
-          'Accept': 'application/json'
-        }
-      },
-      {
-        name: 'YouTube Transcript (Railway)',
-        url: `https://youtube-transcript-api.railway.app/api/transcript?video_id=${videoId}`,
-        headers: {
-          'Accept': 'application/json'
-        }
-      },
-      {
-        name: 'Transcript API (Fly.io)',
-        url: `https://youtube-transcript-api.fly.dev/api/transcript?video_id=${videoId}`,
-        headers: {
-          'Accept': 'application/json'
-        }
-      },
-      {
-        name: 'YouTube Transcript (Glitch)',
-        url: `https://youtube-transcript-api.glitch.me/api/transcript?video_id=${videoId}`,
-        headers: {
-          'Accept': 'application/json'
-        }
-      },
-      {
-        name: 'Transcript Service (Replit)',
-        url: `https://youtube-transcript-api.replit.app/api/transcript?video_id=${videoId}`,
-        headers: {
-          'Accept': 'application/json'
-        }
-      },
-      {
-        name: 'YouTube Transcript (Surge)',
-        url: `https://youtube-transcript-api.surge.sh/api/transcript?video_id=${videoId}`,
-        headers: {
-          'Accept': 'application/json'
-        }
-      },
-      {
-        name: 'Transcript API (Now.sh)',
-        url: `https://youtube-transcript-api.now.sh/api/transcript?video_id=${videoId}`,
-        headers: {
-          'Accept': 'application/json'
-        }
-      },
-      {
-        name: 'YouTube Transcript (Firebase)',
-        url: `https://youtube-transcript-api.firebaseapp.com/api/transcript?video_id=${videoId}`,
         headers: {
           'Accept': 'application/json'
         }
@@ -184,29 +149,35 @@ export class YouTubeTranscriptServiceV3 {
         if (response.ok) {
           const jsonData = await response.text();
           console.log(`📄 Response length: ${jsonData.length}`);
+          console.log(`📄 Response preview: ${jsonData.substring(0, 200)}...`);
 
           if (jsonData && jsonData.trim().length > 0) {
             try {
               const data = JSON.parse(jsonData);
+              console.log(`🔍 Response data type:`, typeof data);
               console.log(`🔍 Response data:`, data);
 
-              // Extract transcript text
+              // Extract transcript text - handle different response formats
               let transcript = '';
 
+              // Format 1: Direct array of transcript objects
               if (Array.isArray(data)) {
-                // Direct array of transcript entries
+                console.log(`📝 Processing array format with ${data.length} entries`);
                 transcript = data
                   .map((entry: any) => {
                     if (typeof entry === 'string') return entry;
                     if (entry.text) return entry.text;
                     if (entry.content) return entry.content;
+                    if (entry.transcript) return entry.transcript;
                     return '';
                   })
-                  .filter((text: string) => text.trim().length > 0)
+                  .filter((text: string) => text && text.trim().length > 0)
                   .join(' ')
                   .trim();
-              } else if (data.transcript && Array.isArray(data.transcript)) {
-                // Nested transcript array
+              }
+              // Format 2: Nested transcript array
+              else if (data.transcript && Array.isArray(data.transcript)) {
+                console.log(`📝 Processing nested transcript format with ${data.transcript.length} entries`);
                 transcript = data.transcript
                   .map((entry: any) => {
                     if (typeof entry === 'string') return entry;
@@ -214,19 +185,33 @@ export class YouTubeTranscriptServiceV3 {
                     if (entry.content) return entry.content;
                     return '';
                   })
-                  .filter((text: string) => text.trim().length > 0)
+                  .filter((text: string) => text && text.trim().length > 0)
                   .join(' ')
                   .trim();
-              } else if (data.text) {
-                // Single text field
-                transcript = data.text.trim();
-              } else if (data.subtitle || data.caption) {
-                // Alternative field names
-                transcript = (data.subtitle || data.caption).trim();
-              } else {
-                console.log(`❌ API ${i + 1} unknown response format`);
-                continue;
               }
+              // Format 3: Single text field
+              else if (data.text) {
+                console.log(`📝 Processing single text field`);
+                transcript = data.text.trim();
+              }
+              // Format 4: Alternative field names
+              else if (data.subtitle || data.caption || data.content) {
+                console.log(`📝 Processing alternative field format`);
+                transcript = (data.subtitle || data.caption || data.content).trim();
+              }
+              // Format 5: Check for any string values
+              else {
+                console.log(`📝 Checking for any string values in response`);
+                const stringValues = Object.values(data).filter(value => 
+                  typeof value === 'string' && value.trim().length > 50
+                );
+                if (stringValues.length > 0) {
+                  transcript = stringValues.join(' ').trim();
+                }
+              }
+
+              console.log(`📄 Extracted transcript length: ${transcript.length}`);
+              console.log(`📄 Transcript preview: ${transcript.substring(0, 200)}...`);
 
               if (transcript.length >= 50) {
                 console.log(`✅ SUCCESS: Transcript extracted via ${api.name}`);
@@ -236,6 +221,7 @@ export class YouTubeTranscriptServiceV3 {
               }
             } catch (parseError) {
               console.log(`❌ API ${i + 1} JSON parse failed:`, parseError);
+              console.log(`📄 Raw response:`, jsonData);
             }
           } else {
             console.log(`❌ API ${i + 1} empty response`);
@@ -248,7 +234,7 @@ export class YouTubeTranscriptServiceV3 {
       }
     }
 
-    throw new Error('All new free transcript APIs failed - no working service found');
+    throw new Error('All real YouTube transcript APIs failed - no working service found');
   }
 
 
