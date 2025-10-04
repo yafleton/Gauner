@@ -145,36 +145,67 @@ export class YouTubeTranscriptServiceV3 {
     try {
       console.log('🔍 Extracting transcript from HTML response...');
       
-      // Look for the actual transcript content - it should be after the title but before UI elements
-      // The transcript usually starts after "Transcript of" and contains dialogue
-      const transcriptStartPattern = /Transcript of[^<]*<[^>]*>([\s\S]*?)(?:Author:|AI Translate|Translate this|Target Language|Most Used|Back Top)/i;
-      const match = html.match(transcriptStartPattern);
+      // First, remove all JavaScript and CSS to avoid extracting code
+      let cleanHtml = html
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<link[^>]*>/gi, '')
+        .replace(/<meta[^>]*>/gi, '');
+      
+      console.log('🧹 Removed scripts and styles');
+      
+      // Look for the actual transcript content - it should be after "Transcript of" title
+      // and before UI elements like "Author:", "AI Translate", etc.
+      const transcriptPattern = /Transcript of[^<]*<[^>]*>([\s\S]*?)(?:Author:|AI Translate|Translate this|Target Language|Most Used|Back Top|Help us improve|Generating Content|Finding this tol useful|Aces API|Fedback|Contact|Terms and Conditions|Privacy Policy|Change Cokie Consent|YouTubeToTranscript\.com|Get Fre Transcript|adsbygogle)/i;
+      
+      const match = cleanHtml.match(transcriptPattern);
       
       if (match && match[1]) {
         console.log('✅ Found transcript content between title and UI elements');
         const rawContent = match[1];
         
-        // Clean up the content
+        // Clean up the content - remove HTML tags and decode entities
         const cleanContent = rawContent
           .replace(/<[^>]*>/g, ' ') // Remove HTML tags
           .replace(/&#34;/g, '"')
           .replace(/&#39;/g, "'")
           .replace(/&quot;/g, '"')
           .replace(/&amp;/g, '&')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&midot;/g, '•')
+          .replace(/\s+/g, ' ') // Normalize whitespace
+          .trim();
+        
+        // Filter out any remaining UI text
+        const finalContent = cleanContent
+          .replace(/Author:\s*[^•]+•/gi, '')
+          .replace(/Like\s*•/gi, '')
+          .replace(/Subscribe\s*•/gi, '')
+          .replace(/Share\s*/gi, '')
+          .replace(/Transcript\s*Pin\s*video/gi, '')
+          .replace(/AI\s*Translate\s*Transcript/gi, '')
+          .replace(/Translate\s*this\s*transcript/gi, '')
+          .replace(/Target\s*Language/gi, '')
+          .replace(/Select\s*a\s*language/gi, '')
+          .replace(/Translation\s*completed/gi, '')
+          .replace(/Show\s*Translation/gi, '')
+          .replace(/Show\s*Original/gi, '')
+          .replace(/Translation\s*failed/gi, '')
+          .replace(/Copy\s*Timestamp/gi, '')
           .replace(/\s+/g, ' ')
           .trim();
         
-        if (cleanContent.length > 200) {
-          console.log(`✅ Extracted clean transcript (${cleanContent.length} chars)`);
-          return cleanContent;
+        if (finalContent.length > 300) {
+          console.log(`✅ Extracted clean transcript (${finalContent.length} chars)`);
+          return finalContent;
         }
       }
       
-      // Alternative: Look for content that contains dialogue patterns
+      // Alternative: Look for content that contains dialogue patterns with quotes
       const dialoguePattern = /(".*?"[\s\S]*?"[^"]*")/g;
-      const dialogueMatches = html.match(dialoguePattern);
+      const dialogueMatches = cleanHtml.match(dialoguePattern);
       
-      if (dialogueMatches && dialogueMatches.length > 5) {
+      if (dialogueMatches && dialogueMatches.length > 10) {
         console.log('✅ Found dialogue patterns');
         const dialogueContent = dialogueMatches.join(' ').trim();
         
@@ -187,45 +218,9 @@ export class YouTubeTranscriptServiceV3 {
           .replace(/\s+/g, ' ')
           .trim();
         
-        if (cleanDialogue.length > 200) {
+        if (cleanDialogue.length > 500) {
           console.log(`✅ Extracted dialogue content (${cleanDialogue.length} chars)`);
           return cleanDialogue;
-        }
-      }
-      
-      // Last resort: Look for any textarea or content area that might contain the transcript
-      const textareaPattern = /<textarea[^>]*>([\s\S]*?)<\/textarea>/i;
-      const textareaMatch = html.match(textareaPattern);
-      
-      if (textareaMatch && textareaMatch[1]) {
-        console.log('✅ Found textarea content');
-        const textareaContent = textareaMatch[1];
-        
-        // Clean and extract only the actual transcript part
-        const cleanTextarea = textareaContent
-          .replace(/<[^>]*>/g, ' ')
-          .replace(/&#34;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/&quot;/g, '"')
-          .replace(/&amp;/g, '&')
-          .replace(/\s+/g, ' ')
-          .trim();
-        
-        // Try to find the actual transcript within the textarea
-        const transcriptInTextarea = /Transcript of[^<]*<[^>]*>([\s\S]*?)(?:Author:|AI Translate|Translate this|Target Language)/i.exec(cleanTextarea);
-        
-        if (transcriptInTextarea && transcriptInTextarea[1]) {
-          const finalTranscript = transcriptInTextarea[1].trim();
-          if (finalTranscript.length > 200) {
-            console.log(`✅ Extracted transcript from textarea (${finalTranscript.length} chars)`);
-            return finalTranscript;
-          }
-        }
-        
-        // If no specific pattern, return the cleaned textarea content if it's long enough
-        if (cleanTextarea.length > 500) {
-          console.log(`✅ Using full textarea content (${cleanTextarea.length} chars)`);
-          return cleanTextarea;
         }
       }
       
