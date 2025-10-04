@@ -165,80 +165,202 @@ export class YouTubeTranscriptServiceV2 {
     throw new Error('Direct API access failed');
   }
 
-  // Method 2: Via CORS proxy
+  // Method 2: Via specialized transcript services
   private async fetchTranscriptViaProxy(videoId: string): Promise<string> {
-    console.log('🎯 Trying CORS proxy method...');
+    console.log('🎯 Trying specialized transcript services...');
     
-    const proxies = [
-      'https://api.allorigins.win/raw?url=',
-      'https://corsproxy.io/?',
-      'https://thingproxy.freeboard.io/fetch/',
-      'https://api.codetabs.com/v1/proxy?quest='
+    // Try dedicated transcript services that don't rely on direct YouTube API
+    const transcriptServices = [
+      {
+        name: 'youtube-transcript-api service',
+        url: `https://youtubetranscript.com/?server_vid2=${videoId}`,
+        proxy: 'https://api.allorigins.win/raw?url='
+      },
+      {
+        name: 'alternative transcript service',
+        url: `https://youtubetranscript.com/?server_vid=${videoId}`,
+        proxy: 'https://corsproxy.io/?'
+      },
+      {
+        name: 'simple transcript service',
+        url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
+        proxy: 'https://api.allorigins.win/raw?url='
+      }
     ];
 
-    const transcriptUrls = [
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`,
-    ];
+    for (const service of transcriptServices) {
+      try {
+        const proxiedUrl = service.proxy + encodeURIComponent(service.url);
+        console.log(`🔍 Trying ${service.name}: ${proxiedUrl}`);
+        
+        const response = await fetch(proxiedUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          }
+        });
 
-    for (const proxy of proxies) {
-      for (const url of transcriptUrls) {
-        try {
-          const proxiedUrl = proxy + encodeURIComponent(url);
-          console.log(`🔍 Trying proxy: ${proxy} with ${url}`);
+        if (response.ok) {
+          const text = await response.text();
+          console.log(`📄 Response from ${service.name}:`, text.substring(0, 200) + '...');
           
-          const response = await fetch(proxiedUrl, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json, text/plain, */*',
-              'Accept-Language': 'en-US,en;q=0.9',
-            }
-          });
-
-          if (response.ok) {
-            const text = await response.text();
-            if (text && text.trim().length > 0) {
-              const transcript = this.parseTranscriptText(text);
-              if (transcript.trim().length > 10) {
-                console.log(`✅ Success with proxy: ${proxy}`);
-                return transcript;
-              }
+          // Check if we got an error page instead of transcript
+          if (this.isErrorPage(text)) {
+            console.log(`⚠️ ${service.name} returned error page, skipping`);
+            continue;
+          }
+          
+          if (text && text.trim().length > 0) {
+            const transcript = this.parseTranscriptText(text);
+            if (transcript.trim().length > 10) {
+              console.log(`✅ Success with ${service.name}`);
+              return transcript;
             }
           }
-        } catch (error) {
-          console.warn(`❌ Proxy failed: ${proxy}`, error);
         }
+      } catch (error) {
+        console.warn(`❌ ${service.name} failed:`, error);
       }
     }
 
-    throw new Error('Proxy method failed');
+    throw new Error('Specialized services failed');
   }
 
-  // Method 3: Scraping approach
-  private async fetchTranscriptScraping(videoId: string): Promise<string> {
-    console.log('🎯 Trying scraping method...');
+  // Check if response is an error page
+  private isErrorPage(text: string): boolean {
+    const errorIndicators = [
+      'We\'re sorry',
+      'automated queries',
+      'can\'t process your request',
+      'Google Help',
+      'sory..',
+      'body { font-family: verdana',
+      'background-color: #f',
+      'color: #0',
+      'Gogle'
+    ];
     
-    try {
-      // Use a service that provides transcript scraping
-      const serviceUrl = `https://youtubetranscript.com/?server_vid2=${videoId}`;
-      
-      // Try with different proxies
-      const proxies = [
-        'https://api.allorigins.win/raw?url=',
-        'https://corsproxy.io/?',
-      ];
+    return errorIndicators.some(indicator => 
+      text.toLowerCase().includes(indicator.toLowerCase())
+    );
+  }
 
-      for (const proxy of proxies) {
-        try {
-          const proxiedUrl = proxy + encodeURIComponent(serviceUrl);
-          console.log(`🔍 Trying scraping service with proxy: ${proxy}`);
+  // Method 3: Alternative scraping approaches
+  private async fetchTranscriptScraping(videoId: string): Promise<string> {
+    console.log('🎯 Trying alternative scraping methods...');
+    
+    // Try different approaches that might work better
+    const scrapingMethods = [
+      {
+        name: 'HTML page parsing',
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        method: 'html'
+      },
+      {
+        name: 'embed page parsing',
+        url: `https://www.youtube.com/embed/${videoId}`,
+        method: 'embed'
+      },
+      {
+        name: 'alternative transcript API',
+        url: `https://youtubetranscript.com/?server_vid2=${videoId}`,
+        method: 'api'
+      }
+    ];
+
+    for (const method of scrapingMethods) {
+      try {
+        console.log(`🔍 Trying ${method.name}: ${method.url}`);
+        
+        // Use a reliable proxy
+        const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(method.url);
+        
+        const response = await fetch(proxyUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+          }
+        });
+
+        if (response.ok) {
+          const text = await response.text();
+          console.log(`📄 Response from ${method.name}:`, text.substring(0, 200) + '...');
           
-          const response = await fetch(proxiedUrl, {
-            method: 'GET',
+          // Check for error pages
+          if (this.isErrorPage(text)) {
+            console.log(`⚠️ ${method.name} returned error page, skipping`);
+            continue;
+          }
+          
+          if (text && text.trim().length > 0) {
+            let transcript: string;
+            
+            if (method.method === 'html' || method.method === 'embed') {
+              // Extract transcript URLs from HTML
+              transcript = await this.extractTranscriptFromHtml(text, videoId);
+            } else {
+              // Parse API response
+              transcript = this.parseTranscriptText(text);
+            }
+            
+            if (transcript && transcript.trim().length > 10) {
+              console.log(`✅ Success with ${method.name}`);
+              return transcript;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`❌ ${method.name} failed:`, error);
+      }
+    }
+
+    throw new Error('All scraping methods failed');
+  }
+
+  // Extract transcript from YouTube page HTML
+  private async extractTranscriptFromHtml(html: string, videoId: string): Promise<string> {
+    try {
+      console.log('🔍 Extracting transcript URLs from HTML...');
+      
+      // Look for transcript URLs in the page
+      const transcriptUrlPatterns = [
+        /"baseUrl":"([^"]*timedtext[^"]*)"/g,
+        /"captionTracks":\s*\[([^\]]+)\]/g,
+        /"captions":\s*{[^}]*"baseUrl":"([^"]+)"/g
+      ];
+      
+      const transcriptUrls: string[] = [];
+      
+      for (const pattern of transcriptUrlPatterns) {
+        const matches = html.match(pattern);
+        if (matches) {
+          matches.forEach(match => {
+            const urlMatch = match.match(/"baseUrl":"([^"]+)"/);
+            if (urlMatch) {
+              const url = decodeURIComponent(urlMatch[1]);
+              if (url.includes('timedtext') && !transcriptUrls.includes(url)) {
+                transcriptUrls.push(url);
+              }
+            }
+          });
+        }
+      }
+      
+      console.log('🔍 Found transcript URLs:', transcriptUrls);
+      
+      // Try each transcript URL
+      for (const url of transcriptUrls) {
+        try {
+          console.log('🔍 Fetching transcript from URL:', url);
+          
+          const response = await fetch(url, {
             headers: {
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Referer': 'https://www.youtube.com/',
             }
           });
 
@@ -247,20 +369,54 @@ export class YouTubeTranscriptServiceV2 {
             if (text && text.trim().length > 0) {
               const transcript = this.parseTranscriptText(text);
               if (transcript.trim().length > 10) {
-                console.log(`✅ Success with scraping service: ${proxy}`);
+                console.log('✅ Successfully extracted transcript from HTML');
                 return transcript;
               }
             }
           }
         } catch (error) {
-          console.warn(`❌ Scraping service failed with proxy: ${proxy}`, error);
+          console.warn('❌ Failed to fetch transcript from URL:', url, error);
         }
       }
-    } catch (error) {
-      console.warn('❌ Scraping method failed:', error);
-    }
+      
+      // If no URLs found, try common patterns
+      const commonUrls = [
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
+        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`,
+      ];
+      
+      for (const url of commonUrls) {
+        try {
+          console.log('🔍 Trying common URL:', url);
+          
+          const response = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Referer': 'https://www.youtube.com/',
+            }
+          });
 
-    throw new Error('Scraping method failed');
+          if (response.ok) {
+            const text = await response.text();
+            if (text && text.trim().length > 0) {
+              const transcript = this.parseTranscriptText(text);
+              if (transcript.trim().length > 10) {
+                console.log('✅ Successfully extracted transcript from common URL');
+                return transcript;
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('❌ Failed to fetch from common URL:', url, error);
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error extracting transcript from HTML:', error);
+    }
+    
+    throw new Error('Failed to extract transcript from HTML');
   }
 
   // Parse transcript text in various formats
