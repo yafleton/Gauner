@@ -88,38 +88,70 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // WORKING TRANSCRIPT: Use external services directly (Worker not deployed yet)
+  // WORKING TRANSCRIPT: Use Railway-hosted YouTube Transcript API
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 WORKING TRANSCRIPT: Using external services directly (Worker not deployed yet)');
+    console.log('🎯 WORKING TRANSCRIPT: Using Railway-hosted YouTube Transcript API');
     
-    // Go directly to external services since worker is not deployed
-    console.log('🔄 Using external services directly...');
-    return await this.getTranscriptFallback(videoId);
+    try {
+      // Use our Railway-hosted API
+      const apiUrl = 'https://youtube-transcript-api-production.up.railway.app';
+      const transcriptUrl = `${apiUrl}/transcript/${videoId}`;
+      
+      console.log('🔍 Calling Railway API:', transcriptUrl);
+      
+      const response = await fetch(transcriptUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('📡 Railway API response status:', response.status);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('📄 Railway API response data:', responseData);
+
+        if (responseData.success && responseData.transcript) {
+          const transcript = responseData.transcript.trim();
+          
+          console.log(`✅ SUCCESS: Real transcript extracted via Railway API`);
+          console.log(`📄 Transcript length: ${transcript.length} characters`);
+          console.log(`📄 Transcript preview: ${transcript.substring(0, 200)}...`);
+          console.log(`🌍 Language used: ${responseData.language_used}`);
+          console.log(`📊 Segments count: ${responseData.segments_count}`);
+          
+          return transcript;
+        } else {
+          console.log('❌ Railway API returned error:', responseData.detail || 'Unknown error');
+          return `Transcript extraction failed: ${responseData.detail || 'Unknown error'}`;
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.log('❌ Railway API request failed:', response.status, errorData);
+        return `Transcript extraction failed: HTTP ${response.status} - ${errorData.detail || 'Unknown error'}`;
+      }
+
+    } catch (error) {
+      console.log('❌ Railway API error:', error);
+      
+      // Fallback to informative message if Railway API fails
+      console.log('🔄 Railway API failed - returning informative message');
+      return this.getFallbackMessage(videoId);
+    }
   }
 
-  // Fallback method - return informative message since external services are down
-  private async getTranscriptFallback(videoId: string): Promise<string> {
-    console.log('🎯 REALITY CHECK: External YouTube transcript services are down');
-    
-    // The truth: Most external YouTube transcript services are down due to YouTube blocking them
-    const realityMessage = `YouTube transcript extraction is currently not available for video ${videoId}. 
+  // Fallback method - return informative message
+  private getFallbackMessage(videoId: string): string {
+    return `Transcript extraction failed for video ${videoId}. 
 
-REALITY CHECK:
-❌ Most public YouTube transcript APIs have been shut down by YouTube
-❌ YouTube actively blocks services that extract transcripts
-❌ The youtube-transcript-api Python library works locally but not on public services
-❌ Cloud hosting services (Heroku, Vercel) get IP-blocked by YouTube
+The Railway API might be:
+❌ Starting up (first request takes 10-30 seconds)
+❌ Temporarily unavailable
+❌ Being blocked by YouTube
 
-SOLUTIONS:
-✅ Use the Voice tab to manually add your own text
-✅ Copy/paste transcript text from YouTube manually
-✅ Use local Python script with youtube-transcript-api library
-✅ Wait for a working public service (unlikely)
-
-This is the current state of YouTube transcript extraction in 2024.`;
-    
-    console.log('⚠️ External services are down - returning reality check message');
-    return realityMessage;
+Try again in a few seconds, or use the Voice tab to manually add your text.`;
   }
 
 
