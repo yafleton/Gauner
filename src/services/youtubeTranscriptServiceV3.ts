@@ -93,13 +93,16 @@ export class YouTubeTranscriptServiceV3 {
     console.log('🎯 WORKING TRANSCRIPT: Using youtube-transcript.io API');
     
     try {
-      // Use youtube-transcript.io API with POST request
+      // Use CORS proxy to bypass browser restrictions
       const apiUrl = 'https://www.youtube-transcript.io/api/transcripts/v2';
+      const corsProxy = 'https://api.allorigins.win/raw?url=';
+      const proxiedUrl = `${corsProxy}${encodeURIComponent(apiUrl)}`;
       
-      console.log('🔍 Calling youtube-transcript.io API:', apiUrl);
+      console.log('🔍 Using CORS proxy for youtube-transcript.io API');
       console.log('📹 Video ID:', videoId);
+      console.log('🌐 Proxied URL:', proxiedUrl);
       
-      const response = await fetch(apiUrl, {
+      const response = await fetch(proxiedUrl, {
         method: 'POST',
         headers: {
           'Accept': '*/*',
