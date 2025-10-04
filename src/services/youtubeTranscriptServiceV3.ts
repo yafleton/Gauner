@@ -88,17 +88,19 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // EXTERNAL API METHOD: Use external transcript service
+  // SIMPLE METHOD: Use a simple public transcript service
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 EXTERNAL API METHOD: Using external transcript service');
+    console.log('🎯 SIMPLE METHOD: Using simple public transcript service');
     
     try {
-      // Use an external transcript API service
-      const apiUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
+      // Use a simple CORS proxy to access YouTube transcript API
+      const proxyUrl = 'https://api.allorigins.win/raw?url=';
+      const transcriptUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`;
+      const fullUrl = proxyUrl + encodeURIComponent(transcriptUrl);
       
-      console.log('🔍 Using external API:', apiUrl);
+      console.log('🔍 Using CORS proxy:', fullUrl);
       
-      const response = await fetch(apiUrl, {
+      const response = await fetch(fullUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json,*/*',
@@ -115,59 +117,50 @@ export class YouTubeTranscriptServiceV3 {
         if (jsonData && jsonData.trim().length > 0) {
           try {
             const data = JSON.parse(jsonData);
-            console.log('🔍 API response structure:', Object.keys(data));
+            console.log('🔍 JSON data structure:', Object.keys(data));
             
-            if (Array.isArray(data) && data.length > 0) {
-              // Extract text from transcript entries
-              const transcript = data
-                .map((entry: any) => entry.text || entry)
-                .filter((text: any) => typeof text === 'string' && text.trim().length > 0)
+            if (data.events && Array.isArray(data.events)) {
+              const transcript = data.events
+                .filter((event: any) => event.segs && Array.isArray(event.segs))
+                .map((event: any) => event.segs.map((seg: any) => seg.utf8).join(''))
                 .join(' ')
                 .replace(/\s+/g, ' ')
                 .trim();
               
               if (transcript.length > 50) {
-                console.log('✅ SUCCESS: Transcript extracted via external API');
+                console.log('✅ SUCCESS: Transcript extracted via CORS proxy');
                 return transcript;
-              }
-            } else if (data.transcript && Array.isArray(data.transcript)) {
-              const transcript = data.transcript
-                .map((entry: any) => entry.text || entry)
-                .filter((text: any) => typeof text === 'string' && text.trim().length > 0)
-                .join(' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-              
-              if (transcript.length > 50) {
-                console.log('✅ SUCCESS: Transcript extracted via external API (nested)');
-                return transcript;
+              } else {
+                console.log('❌ Transcript too short:', transcript.length);
               }
             } else {
-              console.log('❌ Unexpected API response structure:', data);
+              console.log('❌ No events array in JSON data');
             }
           } catch (parseError) {
             console.log('❌ JSON parse failed:', parseError);
-            console.log('📄 Raw response:', jsonData.substring(0, 500));
+            console.log('📄 Raw response preview:', jsonData.substring(0, 500));
           }
         } else {
-          console.log('❌ Empty API response');
+          console.log('❌ Empty response from proxy');
         }
       } else {
-        console.log('❌ External API returned status:', response.status);
+        console.log('❌ CORS proxy returned status:', response.status);
         
-        // Try alternative external service
-        const altApiUrl = `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`;
-        console.log('🔍 Trying alternative external API:', altApiUrl);
+        // Try alternative proxy
+        const altProxyUrl = 'https://cors-anywhere.herokuapp.com/';
+        const altFullUrl = altProxyUrl + transcriptUrl;
+        console.log('🔍 Trying alternative CORS proxy:', altFullUrl);
         
-        const altResponse = await fetch(altApiUrl, {
+        const altResponse = await fetch(altFullUrl, {
           method: 'GET',
           headers: {
             'Accept': 'application/json,*/*',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'X-Requested-With': 'XMLHttpRequest'
           }
         });
 
-        console.log('📡 Alt API response status:', altResponse.status);
+        console.log('📡 Alt proxy response status:', altResponse.status);
 
         if (altResponse.ok) {
           const altJsonData = await altResponse.text();
@@ -176,18 +169,17 @@ export class YouTubeTranscriptServiceV3 {
           if (altJsonData && altJsonData.trim().length > 0) {
             try {
               const altData = JSON.parse(altJsonData);
-              console.log('🔍 Alt API response structure:', Object.keys(altData));
               
-              if (Array.isArray(altData) && altData.length > 0) {
-                const transcript = altData
-                  .map((entry: any) => entry.text || entry)
-                  .filter((text: any) => typeof text === 'string' && text.trim().length > 0)
+              if (altData.events && Array.isArray(altData.events)) {
+                const transcript = altData.events
+                  .filter((event: any) => event.segs && Array.isArray(event.segs))
+                  .map((event: any) => event.segs.map((seg: any) => seg.utf8).join(''))
                   .join(' ')
                   .replace(/\s+/g, ' ')
                   .trim();
                 
                 if (transcript.length > 50) {
-                  console.log('✅ SUCCESS: Transcript extracted via alternative external API');
+                  console.log('✅ SUCCESS: Transcript extracted via alternative CORS proxy');
                   return transcript;
                 }
               }
@@ -198,10 +190,10 @@ export class YouTubeTranscriptServiceV3 {
         }
       }
     } catch (error) {
-      console.log('❌ External API method failed:', error);
+      console.log('❌ CORS proxy method failed:', error);
     }
 
-    throw new Error('External API method failed - no transcript found');
+    throw new Error('CORS proxy method failed - no transcript found');
   }
 
   // Parse XML captions
