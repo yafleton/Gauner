@@ -13,8 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Expose port
-EXPOSE $PORT
+# Expose port (Railway uses dynamic ports)
+EXPOSE 10000
 
 # Start the application
-CMD python -m uvicorn api:app --host 0.0.0.0 --port $PORT
+CMD python -m uvicorn api:app --host 0.0.0.0 --port ${PORT:-10000}
