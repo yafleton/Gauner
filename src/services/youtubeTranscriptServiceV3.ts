@@ -123,29 +123,30 @@ export class YouTubeTranscriptServiceV3 {
       console.log('❌ Method 1 failed:', error);
     }
 
-    // Method 2: Try alternative transcript service
+    // Method 2: Try tubetranscript.com (simple GET request)
     try {
-      console.log('🔍 Method 2: Alternative transcript service');
-      const response = await fetch(`https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`, {
+      console.log('🔍 Method 2: tubetranscript.com');
+      const response = await fetch(`https://www.tubetranscript.com/de/watch?v=${videoId}`, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json'
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'de-DE,de;q=0.9',
+          'Cache-Control': 'max-age=0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+          'Referer': 'https://www.tubetranscript.com/de/'
         }
       });
 
       if (response.ok) {
-        const responseData = await response.json();
-        console.log('📄 Method 2 response:', responseData);
+        const htmlText = await response.text();
+        console.log('📄 Method 2 response length:', htmlText.length);
+        console.log('📄 Method 2 response preview:', htmlText.substring(0, 500));
         
-        let transcript = '';
-        if (Array.isArray(responseData)) {
-          transcript = responseData.map((item: any) => item.text || '').join(' ').trim();
-        } else if (responseData.transcript) {
-          transcript = responseData.transcript;
-        }
-        
+        // Extract transcript from HTML
+        const transcript = this.extractTranscriptFromHTML(htmlText);
         if (transcript && transcript.length > 10) {
-          console.log('✅ Method 2 SUCCESS: Alternative service worked');
+          console.log('✅ Method 2 SUCCESS: tubetranscript.com worked');
+          console.log('📄 Transcript preview:', transcript.substring(0, 200));
           return transcript;
         }
       }
@@ -213,6 +214,73 @@ export class YouTubeTranscriptServiceV3 {
         ).join(' ').trim();
       }
     }
+    return null;
+  }
+
+  // Helper method to extract transcript from HTML
+  private extractTranscriptFromHTML(html: string): string | null {
+    try {
+      // Look for common transcript patterns in HTML
+      const patterns = [
+        // Look for <div class="transcript"> or similar
+        /<div[^>]*class="[^"]*transcript[^"]*"[^>]*>(.*?)<\/div>/is,
+        // Look for <pre> tags (often used for transcripts)
+        /<pre[^>]*>(.*?)<\/pre>/is,
+        // Look for <textarea> tags
+        /<textarea[^>]*>(.*?)<\/textarea>/is,
+        // Look for JSON data in script tags
+        /<script[^>]*>.*?transcript.*?:\s*["'](.*?)["'].*?<\/script>/is,
+        // Look for any text content that might be a transcript
+        /transcript[^>]*>([^<]+)/i
+      ];
+
+      for (const pattern of patterns) {
+        const match = html.match(pattern);
+        if (match && match[1]) {
+          let transcript = match[1]
+            .replace(/<[^>]*>/g, '') // Remove HTML tags
+            .replace(/&quot;/g, '"') // Decode HTML entities
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&#39;/g, "'")
+            .replace(/&#34;/g, '"')
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .trim();
+
+          if (transcript && transcript.length > 20) {
+            console.log('📄 Extracted transcript from HTML:', transcript.substring(0, 200));
+            return transcript;
+          }
+        }
+      }
+
+      // Fallback: Look for any long text content that might be a transcript
+      const textContent = html
+        .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove scripts
+        .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove styles
+        .replace(/<[^>]*>/g, ' ') // Remove all HTML tags
+        .replace(/&quot;/g, '"') // Decode HTML entities
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&#39;/g, "'")
+        .replace(/&#34;/g, '"')
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
+
+      // Look for sentences that might be transcript content
+      const sentences = textContent.split(/[.!?]+/).filter(s => s.trim().length > 20);
+      if (sentences.length >= 3) {
+        const transcript = sentences.join('. ').trim();
+        console.log('📄 Extracted transcript from text content:', transcript.substring(0, 200));
+        return transcript;
+      }
+
+    } catch (error) {
+      console.log('❌ Error extracting transcript from HTML:', error);
+    }
+
     return null;
   }
 
