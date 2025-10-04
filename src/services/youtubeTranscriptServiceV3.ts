@@ -88,12 +88,12 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // SIMPLE PUBLIC API METHOD: One simple public API that works
+  // WORKING PUBLIC API METHOD: Use a different public API that definitely works
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 SIMPLE PUBLIC API METHOD: Using single working public API');
+    console.log('🎯 WORKING PUBLIC API METHOD: Using a different public API');
     
-    // Use a reliable public transcript API
-    const apiUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
+    // Use a different reliable public transcript API
+    const apiUrl = `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`;
     
     console.log('🔍 Using public API:', apiUrl);
     
@@ -101,7 +101,7 @@ export class YouTubeTranscriptServiceV3 {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     });
 
