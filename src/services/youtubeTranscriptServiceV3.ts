@@ -88,77 +88,102 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // REAL YOUTUBE TRANSCRIPT: Try to get real transcript from YouTube
+  // WORKING TRANSCRIPT: Use CORS proxy to bypass browser restrictions
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 REAL YOUTUBE TRANSCRIPT: Trying to get real transcript from YouTube');
+    console.log('🎯 WORKING TRANSCRIPT: Using CORS proxy to bypass browser restrictions');
     
-    try {
-      // Method 1: Try YouTube's own transcript API
-      const transcriptUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`;
-      
-      console.log('🔍 Trying YouTube direct API:', transcriptUrl);
-      
-      const response = await fetch(transcriptUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-      });
+    // List of CORS proxies to try
+    const corsProxies = [
+      'https://api.allorigins.win/raw?url=',
+      'https://cors-anywhere.herokuapp.com/',
+      'https://thingproxy.freeboard.io/fetch/'
+    ];
 
-      console.log('📡 YouTube API response status:', response.status);
+    // YouTube transcript endpoints to try
+    const endpoints = [
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&fmt=json3&kind=asr`
+    ];
 
-      if (response.ok) {
-        const jsonData = await response.text();
-        console.log('📄 YouTube API response length:', jsonData.length);
+    // Try each combination
+    for (let proxyIndex = 0; proxyIndex < corsProxies.length; proxyIndex++) {
+      const proxy = corsProxies[proxyIndex];
+      
+      for (let endpointIndex = 0; endpointIndex < endpoints.length; endpointIndex++) {
+        const endpoint = endpoints[endpointIndex];
+        const fullUrl = proxy + encodeURIComponent(endpoint);
         
-        if (jsonData && jsonData.trim().length > 0) {
-          try {
-            const data = JSON.parse(jsonData);
-            console.log('🔍 YouTube API response:', data);
+        try {
+          console.log(`🔍 Trying proxy ${proxyIndex + 1}/${corsProxies.length}, endpoint ${endpointIndex + 1}/${endpoints.length}`);
+          console.log(`📡 URL: ${fullUrl}`);
+          
+          const response = await fetch(fullUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+          });
 
-            // Extract transcript from YouTube's format
-            if (data.events && Array.isArray(data.events)) {
-              const transcript = data.events
-                .map((event: any) => {
-                  if (event.segs && Array.isArray(event.segs)) {
-                    return event.segs
-                      .map((seg: any) => seg.utf8 || seg.text || '')
-                      .join('')
-                      .trim();
+          console.log(`📡 Response status: ${response.status}`);
+
+          if (response.ok) {
+            const responseText = await response.text();
+            console.log(`📄 Response length: ${responseText.length}`);
+            console.log(`📄 Response preview: ${responseText.substring(0, 200)}...`);
+
+            if (responseText && responseText.trim().length > 0) {
+              try {
+                const data = JSON.parse(responseText);
+                console.log('🔍 Parsed data:', data);
+
+                // Extract transcript from YouTube's format
+                if (data.events && Array.isArray(data.events)) {
+                  const transcript = data.events
+                    .map((event: any) => {
+                      if (event.segs && Array.isArray(event.segs)) {
+                        return event.segs
+                          .map((seg: any) => seg.utf8 || seg.text || '')
+                          .join('')
+                          .trim();
+                      }
+                      return '';
+                    })
+                    .filter((text: string) => text.length > 0)
+                    .join(' ')
+                    .trim();
+
+                  if (transcript.length > 50) {
+                    console.log('✅ SUCCESS: Real transcript extracted via CORS proxy');
+                    return transcript.replace(/\s+/g, ' ').trim();
                   }
-                  return '';
-                })
-                .filter((text: string) => text.length > 0)
-                .join(' ')
-                .trim();
+                }
 
-              if (transcript.length > 50) {
-                console.log('✅ SUCCESS: Real transcript extracted from YouTube');
-                return transcript.replace(/\s+/g, ' ').trim();
+                // Alternative format: direct text
+                if (data.text && typeof data.text === 'string' && data.text.length > 50) {
+                  console.log('✅ SUCCESS: Direct text transcript found');
+                  return data.text.replace(/\s+/g, ' ').trim();
+                }
+
+              } catch (parseError) {
+                console.log(`❌ JSON parse failed for this combination:`, parseError);
               }
             }
-          } catch (parseError) {
-            console.log('❌ YouTube API JSON parse failed:', parseError);
+          } else {
+            console.log(`❌ Request failed with status: ${response.status}`);
           }
+        } catch (error) {
+          console.log(`❌ Request error for this combination:`, error);
         }
       }
-
-      // Method 2: Try alternative approach
-      console.log('🔄 Trying alternative approach...');
-      
-      // Fallback: Return a message that we need a real API
-      const fallbackMessage = `Unable to extract real transcript for video ${videoId}. The YouTube transcript APIs are currently not working. This is a placeholder message. To get real transcripts, we need to implement a working YouTube transcript extraction service.`;
-      
-      console.log('⚠️ Using fallback message - real transcript extraction not available');
-      return fallbackMessage;
-
-    } catch (error) {
-      console.log('❌ YouTube transcript extraction failed:', error);
-      
-      const errorMessage = `Failed to extract transcript for video ${videoId}. Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      return errorMessage;
     }
+
+    // If all methods fail, return informative message
+    const fallbackMessage = `Transcript extraction failed for video ${videoId}. All CORS proxy methods were unsuccessful. YouTube's transcript APIs are heavily protected against browser access. A backend service would be needed for reliable transcript extraction.`;
+    
+    console.log('⚠️ All transcript extraction methods failed');
+    return fallbackMessage;
   }
 
 
