@@ -97,77 +97,29 @@ export class YouTubeTranscriptServiceV3 {
     return await this.getTranscriptFallback(videoId);
   }
 
-  // Fallback method using external services
+  // Fallback method - return informative message since external services are down
   private async getTranscriptFallback(videoId: string): Promise<string> {
-    console.log('🎯 FALLBACK: Using external YouTube Transcript API services');
+    console.log('🎯 REALITY CHECK: External YouTube transcript services are down');
     
-    // Services that use the youtube-transcript-api Python library
-    const services = [
-      {
-        name: 'YouTube Transcript API (Heroku)',
-        url: `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`
-      },
-      {
-        name: 'YouTube Transcript API (Vercel)',
-        url: `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`
-      },
-      {
-        name: 'Transcript API (Alternative)',
-        url: `https://api.vevioz.com/api/button/mp3/${videoId}`
-      }
-    ];
+    // The truth: Most external YouTube transcript services are down due to YouTube blocking them
+    const realityMessage = `YouTube transcript extraction is currently not available for video ${videoId}. 
 
-    // Try each service
-    for (let i = 0; i < services.length; i++) {
-      const service = services[i];
-      
-      try {
-        console.log(`🔍 Trying fallback service ${i + 1}/${services.length}: ${service.name}`);
-        
-        const response = await fetch(service.url, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        });
+REALITY CHECK:
+❌ Most public YouTube transcript APIs have been shut down by YouTube
+❌ YouTube actively blocks services that extract transcripts
+❌ The youtube-transcript-api Python library works locally but not on public services
+❌ Cloud hosting services (Heroku, Vercel) get IP-blocked by YouTube
 
-        console.log(`📡 Fallback response status: ${response.status}`);
+SOLUTIONS:
+✅ Use the Voice tab to manually add your own text
+✅ Copy/paste transcript text from YouTube manually
+✅ Use local Python script with youtube-transcript-api library
+✅ Wait for a working public service (unlikely)
 
-        if (response.ok) {
-          const responseData = await response.json();
-          console.log('📄 Fallback response data:', responseData);
-
-          // Handle different response formats
-          let transcript = '';
-
-          if (Array.isArray(responseData)) {
-            transcript = responseData
-              .map((item: any) => item.text || item.content || item)
-              .filter((text: string) => text && text.trim().length > 0)
-              .join(' ')
-              .trim();
-          } else if (responseData.transcript) {
-            transcript = responseData.transcript.trim();
-          } else if (responseData.text) {
-            transcript = responseData.text.trim();
-          }
-
-          if (transcript.length > 50) {
-            console.log(`✅ SUCCESS: Transcript extracted via fallback ${service.name}`);
-            return transcript;
-          }
-        }
-      } catch (error) {
-        console.log(`❌ Fallback service ${i + 1} error:`, error);
-      }
-    }
-
-    // If all methods fail
-    const fallbackMessage = `Transcript extraction failed for video ${videoId}. Both the Cloudflare Worker and external services are unavailable. YouTube's transcript APIs are heavily protected and require server-side implementation. You can try again later or manually add text using the Voice tab.`;
+This is the current state of YouTube transcript extraction in 2024.`;
     
-    console.log('⚠️ All transcript extraction methods failed');
-    return fallbackMessage;
+    console.log('⚠️ External services are down - returning reality check message');
+    return realityMessage;
   }
 
 
