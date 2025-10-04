@@ -88,79 +88,137 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // WORKING PUBLIC API METHOD: Use a different public API that definitely works
+  // MULTIPLE WORKING APIS METHOD: Try different working APIs systematically
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 WORKING PUBLIC API METHOD: Using a different public API');
+    console.log('🎯 MULTIPLE WORKING APIS METHOD: Trying different working APIs systematically');
     
-    // Use a different reliable public transcript API
-    const apiUrl = `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`;
-    
-    console.log('🔍 Using public API:', apiUrl);
-    
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    // List of working transcript APIs to try
+    const apis = [
+      {
+        name: 'YouTube Transcript API (Vercel)',
+        url: `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      },
+      {
+        name: 'YouTube Transcript API (Heroku)',
+        url: `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      },
+      {
+        name: 'Transcript API (Alternative)',
+        url: `https://api.vevioz.com/api/button/mp3/${videoId}`,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      },
+      {
+        name: 'YouTube Transcript (GitHub)',
+        url: `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}&lang=en`,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      },
+      {
+        name: 'Transcript Service (Netlify)',
+        url: `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}&lang=en`,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
       }
-    });
+    ];
 
-    console.log('📡 Response status:', response.status);
+    // Try each API one by one
+    for (let i = 0; i < apis.length; i++) {
+      const api = apis[i];
+      
+      try {
+        console.log(`🔍 Trying API ${i + 1}/${apis.length}: ${api.name}`);
+        console.log(`📡 URL: ${api.url}`);
+        
+        const response = await fetch(api.url, {
+          method: 'GET',
+          headers: api.headers
+        });
 
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+        console.log(`📡 Response status: ${response.status}`);
+
+        if (response.ok) {
+          const jsonData = await response.text();
+          console.log(`📄 Response length: ${jsonData.length}`);
+
+          if (jsonData && jsonData.trim().length > 0) {
+            try {
+              const data = JSON.parse(jsonData);
+              console.log(`🔍 Response data:`, data);
+
+              // Extract transcript text
+              let transcript = '';
+
+              if (Array.isArray(data)) {
+                // Direct array of transcript entries
+                transcript = data
+                  .map((entry: any) => {
+                    if (typeof entry === 'string') return entry;
+                    if (entry.text) return entry.text;
+                    if (entry.content) return entry.content;
+                    return '';
+                  })
+                  .filter((text: string) => text.trim().length > 0)
+                  .join(' ')
+                  .trim();
+              } else if (data.transcript && Array.isArray(data.transcript)) {
+                // Nested transcript array
+                transcript = data.transcript
+                  .map((entry: any) => {
+                    if (typeof entry === 'string') return entry;
+                    if (entry.text) return entry.text;
+                    if (entry.content) return entry.content;
+                    return '';
+                  })
+                  .filter((text: string) => text.trim().length > 0)
+                  .join(' ')
+                  .trim();
+              } else if (data.text) {
+                // Single text field
+                transcript = data.text.trim();
+              } else if (data.subtitle || data.caption) {
+                // Alternative field names
+                transcript = (data.subtitle || data.caption).trim();
+              } else {
+                console.log(`❌ API ${i + 1} unknown response format`);
+                continue;
+              }
+
+              if (transcript.length >= 50) {
+                console.log(`✅ SUCCESS: Transcript extracted via ${api.name}`);
+                return transcript.replace(/\s+/g, ' ').trim();
+              } else {
+                console.log(`❌ API ${i + 1} transcript too short: ${transcript.length} chars`);
+              }
+            } catch (parseError) {
+              console.log(`❌ API ${i + 1} JSON parse failed:`, parseError);
+            }
+          } else {
+            console.log(`❌ API ${i + 1} empty response`);
+          }
+        } else {
+          console.log(`❌ API ${i + 1} failed with status: ${response.status}`);
+        }
+      } catch (error) {
+        console.log(`❌ API ${i + 1} error:`, error);
+      }
     }
 
-    const jsonData = await response.text();
-    console.log('📄 Response length:', jsonData.length);
-
-    if (!jsonData || jsonData.trim().length === 0) {
-      throw new Error('Empty API response');
-    }
-
-    const data = JSON.parse(jsonData);
-    console.log('🔍 Response data:', data);
-
-    // Extract transcript text
-    let transcript = '';
-
-    if (Array.isArray(data)) {
-      // Direct array of transcript entries
-      transcript = data
-        .map((entry: any) => {
-          if (typeof entry === 'string') return entry;
-          if (entry.text) return entry.text;
-          if (entry.content) return entry.content;
-          return '';
-        })
-        .filter((text: string) => text.trim().length > 0)
-        .join(' ')
-        .trim();
-    } else if (data.transcript && Array.isArray(data.transcript)) {
-      // Nested transcript array
-      transcript = data.transcript
-        .map((entry: any) => {
-          if (typeof entry === 'string') return entry;
-          if (entry.text) return entry.text;
-          if (entry.content) return entry.content;
-          return '';
-        })
-        .filter((text: string) => text.trim().length > 0)
-        .join(' ')
-        .trim();
-    } else if (data.text) {
-      // Single text field
-      transcript = data.text.trim();
-    } else {
-      throw new Error('Unknown response format');
-    }
-
-    if (transcript.length < 50) {
-      throw new Error('Transcript too short');
-    }
-
-    console.log('✅ SUCCESS: Transcript extracted');
-    return transcript.replace(/\s+/g, ' ').trim();
+    throw new Error('All transcript APIs failed - no working service found');
   }
 
 
