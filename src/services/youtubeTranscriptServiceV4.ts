@@ -88,51 +88,46 @@ export class YouTubeTranscriptServiceV4 {
     };
   }
 
-  // WORKING METHOD: Use direct YouTube subtitle URL with different approach
+  // WORKING METHOD: Use Cloudflare Worker backend
   private async getTranscriptSimple(videoId: string): Promise<string> {
-    console.log('🎯 WORKING METHOD: Using direct YouTube subtitle URL');
+    console.log('🎯 WORKING METHOD: Using Cloudflare Worker backend');
     
     try {
-      // Try different YouTube subtitle URL formats
-      const urls = [
-        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
-        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
-        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=ttml`,
-        `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=vtt`
-      ];
+      // Use Cloudflare Worker to bypass CORS
+      const workerUrl = 'https://youtube-transcript-worker.yafleton.workers.dev/api/transcript';
+      const apiUrl = `${workerUrl}?video_id=${videoId}`;
+      
+      console.log('🔍 Calling Cloudflare Worker:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
 
-      for (let i = 0; i < urls.length; i++) {
-        const url = urls[i];
-        console.log(`🔍 Trying URL ${i + 1}/4:`, url);
-        
-        try {
-          const response = await fetch(url, {
-            method: 'GET',
-            mode: 'no-cors', // This bypasses CORS but limits response access
-            headers: {
-              'Accept': '*/*'
-            }
-          });
+      console.log('📡 Response status:', response.status);
 
-          console.log(`📡 Response for URL ${i + 1}:`, response.type);
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('📄 Response data:', responseData);
 
-          // With no-cors mode, we can't read the response body directly
-          // But we can check if the request succeeded
-          if (response.type === 'opaque') {
-            console.log(`✅ URL ${i + 1} responded (opaque response)`);
-            // Since we can't read the content with no-cors, we'll return a success message
-            return `DEBUG: YouTube subtitle URL ${i + 1} responded but content cannot be read due to CORS. URL: ${url}`;
-          }
-        } catch (error) {
-          console.log(`❌ URL ${i + 1} failed:`, error);
+        if (responseData.success && responseData.transcript) {
+          console.log('✅ SUCCESS: Cloudflare Worker method worked');
+          console.log('📄 Transcript length:', responseData.length);
+          console.log('📄 Transcript preview:', responseData.transcript.substring(0, 200));
+          return responseData.transcript;
+        } else {
+          console.log('❌ No transcript found in response');
+          return `DEBUG: No transcript found in Cloudflare Worker response for ${videoId}. Response: ${JSON.stringify(responseData)}`;
         }
       }
 
-      console.log('❌ All YouTube subtitle URLs failed');
-      return `DEBUG: All direct YouTube subtitle URLs failed for ${videoId}. This indicates a fundamental CORS issue that requires a backend solution.`;
+      console.log('❌ Cloudflare Worker method failed');
+      return `DEBUG: Cloudflare Worker method failed for ${videoId}. Status: ${response.status}`;
 
     } catch (error) {
-      console.log('❌ Direct YouTube subtitle URL error:', error);
+      console.log('❌ Cloudflare Worker method error:', error);
       return `DEBUG: Network error - ${error}`;
     }
   }

@@ -1,0 +1,6 @@
+name = "youtube-transcript-worker"
+main = "worker-transcript.js"
+compatibility_date = "2025-10-04"
+
+[env.production]
+name = "youtube-transcript-worker"
