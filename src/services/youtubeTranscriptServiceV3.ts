@@ -88,93 +88,120 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // NEW METHOD: YouTube Transcript API via public service
+  // EXTERNAL API METHOD: Use external transcript service
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 NEW METHOD: YouTube Transcript API via public service');
+    console.log('🎯 EXTERNAL API METHOD: Using external transcript service');
     
     try {
-      // Use a public transcript API service that mimics youtube-transcript-api
-      const apiUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`;
+      // Use an external transcript API service
+      const apiUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
       
-      console.log('🔍 Using YouTube timedtext API:', apiUrl);
+      console.log('🔍 Using external API:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
-          'Accept': 'application/xml,text/xml,*/*',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Referer': 'https://www.youtube.com/'
+          'Accept': 'application/json,*/*',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
       });
 
       console.log('📡 Response status:', response.status);
 
       if (response.ok) {
-        const xmlData = await response.text();
-        console.log('📄 XML response length:', xmlData.length);
+        const jsonData = await response.text();
+        console.log('📄 JSON response length:', jsonData.length);
         
-        if (xmlData && xmlData.trim().length > 0) {
-          // Parse XML captions
-          const transcript = this.parseXmlCaptions(xmlData);
-          if (transcript && transcript.length > 50) {
-            console.log('✅ SUCCESS: Transcript extracted via YouTube timedtext API');
-            return transcript;
-          } else {
-            console.log('❌ Transcript too short:', transcript.length);
+        if (jsonData && jsonData.trim().length > 0) {
+          try {
+            const data = JSON.parse(jsonData);
+            console.log('🔍 API response structure:', Object.keys(data));
+            
+            if (Array.isArray(data) && data.length > 0) {
+              // Extract text from transcript entries
+              const transcript = data
+                .map((entry: any) => entry.text || entry)
+                .filter((text: any) => typeof text === 'string' && text.trim().length > 0)
+                .join(' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+              
+              if (transcript.length > 50) {
+                console.log('✅ SUCCESS: Transcript extracted via external API');
+                return transcript;
+              }
+            } else if (data.transcript && Array.isArray(data.transcript)) {
+              const transcript = data.transcript
+                .map((entry: any) => entry.text || entry)
+                .filter((text: any) => typeof text === 'string' && text.trim().length > 0)
+                .join(' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+              
+              if (transcript.length > 50) {
+                console.log('✅ SUCCESS: Transcript extracted via external API (nested)');
+                return transcript;
+              }
+            } else {
+              console.log('❌ Unexpected API response structure:', data);
+            }
+          } catch (parseError) {
+            console.log('❌ JSON parse failed:', parseError);
+            console.log('📄 Raw response:', jsonData.substring(0, 500));
           }
         } else {
-          console.log('❌ Empty XML response');
+          console.log('❌ Empty API response');
         }
       } else {
-        console.log('❌ API returned status:', response.status);
+        console.log('❌ External API returned status:', response.status);
         
-        // Try alternative format
-        const altApiUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`;
-        console.log('🔍 Trying alternative format:', altApiUrl);
+        // Try alternative external service
+        const altApiUrl = `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`;
+        console.log('🔍 Trying alternative external API:', altApiUrl);
         
         const altResponse = await fetch(altApiUrl, {
           method: 'GET',
           headers: {
             'Accept': 'application/json,*/*',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': 'https://www.youtube.com/'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
           }
         });
 
-        console.log('📡 Alt response status:', altResponse.status);
+        console.log('📡 Alt API response status:', altResponse.status);
 
         if (altResponse.ok) {
-          const jsonData = await altResponse.text();
-          console.log('📄 JSON response length:', jsonData.length);
+          const altJsonData = await altResponse.text();
+          console.log('📄 Alt JSON response length:', altJsonData.length);
           
-          if (jsonData && jsonData.trim().length > 0) {
+          if (altJsonData && altJsonData.trim().length > 0) {
             try {
-              const parsedData = JSON.parse(jsonData);
-              console.log('🔍 JSON data structure:', Object.keys(parsedData));
+              const altData = JSON.parse(altJsonData);
+              console.log('🔍 Alt API response structure:', Object.keys(altData));
               
-              if (parsedData.events && Array.isArray(parsedData.events)) {
-                const transcript = parsedData.events
-                  .filter((event: any) => event.segs && Array.isArray(event.segs))
-                  .map((event: any) => event.segs.map((seg: any) => seg.utf8).join(''))
+              if (Array.isArray(altData) && altData.length > 0) {
+                const transcript = altData
+                  .map((entry: any) => entry.text || entry)
+                  .filter((text: any) => typeof text === 'string' && text.trim().length > 0)
                   .join(' ')
+                  .replace(/\s+/g, ' ')
                   .trim();
                 
                 if (transcript.length > 50) {
-                  console.log('✅ SUCCESS: Transcript extracted via alternative JSON format');
+                  console.log('✅ SUCCESS: Transcript extracted via alternative external API');
                   return transcript;
                 }
               }
-            } catch (parseError) {
-              console.log('❌ JSON parse failed:', parseError);
+            } catch (altParseError) {
+              console.log('❌ Alt JSON parse failed:', altParseError);
             }
           }
         }
       }
     } catch (error) {
-      console.log('❌ New method failed:', error);
+      console.log('❌ External API method failed:', error);
     }
 
-    throw new Error('New transcript method failed - no transcript found');
+    throw new Error('External API method failed - no transcript found');
   }
 
   // Parse XML captions
