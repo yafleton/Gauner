@@ -29,28 +29,41 @@ export default {
       }
 
       try {
-        // Try different YouTube subtitle formats
-        const formats = ['json3', 'srv3', 'ttml', 'vtt'];
+        // Try different YouTube subtitle formats and URLs
+        const attempts = [
+          { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`, format: 'json3' },
+          { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`, format: 'json3' },
+          { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`, format: 'srv3' },
+          { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=ttml`, format: 'ttml' },
+          { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=vtt`, format: 'vtt' },
+          { url: `https://video.google.com/timedtext?lang=en&v=${videoId}`, format: 'xml' }
+        ];
         
-        for (const format of formats) {
+        const results = [];
+        
+        for (let i = 0; i < attempts.length; i++) {
+          const attempt = attempts[i];
           try {
-            const transcriptUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=${format}`;
-            console.log(`Trying format: ${format}`);
+            console.log(`Trying attempt ${i + 1}: ${attempt.url}`);
             
-            const response = await fetch(transcriptUrl, {
+            const response = await fetch(attempt.url, {
               headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': '*/*'
               }
             });
 
+            console.log(`Response status: ${response.status}, content-type: ${response.headers.get('content-type')}`);
+            
             if (response.ok) {
               const content = await response.text();
-              console.log(`Success with format: ${format}, content length: ${content.length}`);
+              console.log(`Success with attempt ${i + 1}, content length: ${content.length}`);
+              console.log(`Content preview: ${content.substring(0, 200)}`);
               
               // Parse based on format
               let transcript = '';
               
-              if (format === 'json3') {
+              if (attempt.format === 'json3') {
                 try {
                   const data = JSON.parse(content);
                   if (data.events && Array.isArray(data.events)) {
@@ -63,8 +76,7 @@ export default {
                 } catch (e) {
                   console.log('Failed to parse JSON3:', e);
                 }
-              } else if (format === 'srv3') {
-                // Parse SRV3 format (similar to JSON3)
+              } else if (attempt.format === 'srv3') {
                 try {
                   const data = JSON.parse(content);
                   if (data.events && Array.isArray(data.events)) {
@@ -77,7 +89,7 @@ export default {
                 } catch (e) {
                   console.log('Failed to parse SRV3:', e);
                 }
-              } else if (format === 'ttml' || format === 'vtt') {
+              } else if (attempt.format === 'ttml' || attempt.format === 'xml') {
                 // Parse XML/TTML format
                 const textMatches = content.match(/<text[^>]*>(.*?)<\/text>/g);
                 if (textMatches && textMatches.length > 0) {
@@ -95,14 +107,37 @@ export default {
                     .join(' ')
                     .trim();
                 }
+              } else if (attempt.format === 'vtt') {
+                // Parse VTT format
+                const lines = content.split('\n');
+                const textLines = lines.filter(line => 
+                  line.trim() && 
+                  !line.includes('-->') && 
+                  !line.includes('WEBVTT') &&
+                  !line.match(/^\d+$/)
+                );
+                transcript = textLines.join(' ').trim();
               }
+
+              results.push({
+                attempt: i + 1,
+                url: attempt.url,
+                format: attempt.format,
+                status: response.status,
+                contentLength: content.length,
+                transcriptLength: transcript.length,
+                hasTranscript: transcript.length > 10,
+                preview: content.substring(0, 200)
+              });
 
               if (transcript && transcript.length > 10) {
                 return new Response(JSON.stringify({
                   success: true,
                   transcript: transcript,
-                  format: format,
-                  length: transcript.length
+                  format: attempt.format,
+                  length: transcript.length,
+                  url: attempt.url,
+                  debug: results
                 }), {
                   status: 200,
                   headers: {
@@ -111,21 +146,35 @@ export default {
                   },
                 });
               }
+            } else {
+              results.push({
+                attempt: i + 1,
+                url: attempt.url,
+                format: attempt.format,
+                status: response.status,
+                error: `HTTP ${response.status}`
+              });
             }
           } catch (error) {
-            console.log(`Error with format ${format}:`, error);
+            console.log(`Error with attempt ${i + 1}:`, error);
+            results.push({
+              attempt: i + 1,
+              url: attempt.url,
+              format: attempt.format,
+              error: error.message
+            });
             continue;
           }
         }
 
-        // If no format worked, return debug info
+        // If no format worked, return detailed debug info
         return new Response(JSON.stringify({
           success: false,
           error: 'No transcript found for this video',
           debug: {
             videoId: videoId,
-            formats_tried: formats,
-            message: 'This video may not have auto-generated subtitles available'
+            attempts_made: results,
+            message: 'All YouTube subtitle endpoints were tried but no transcript was found'
           }
         }), {
           status: 200, // Return 200 instead of 404 to avoid frontend errors
