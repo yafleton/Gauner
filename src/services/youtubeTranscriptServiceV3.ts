@@ -145,134 +145,87 @@ export class YouTubeTranscriptServiceV3 {
     try {
       console.log('🔍 Extracting transcript from HTML response...');
       
-      // First, try to find the actual transcript content before UI elements
-      const transcriptPatterns = [
-        // Look for content that looks like actual transcript (sentences with quotes)
-        /(".*?")/g,
-        // Look for content after "Transcript" but before UI elements
-        /(?:transcript|transcript of)[\s\S]*?([^<>]*"[^"]*"[^<>]*)/i,
-        // Look for content in paragraphs that contain dialogue
-        /<p[^>]*>([^<>]*"[^"]*"[^<>]*)<\/p>/gi
-      ];
+      // Look for the actual transcript content - it should be after the title but before UI elements
+      // The transcript usually starts after "Transcript of" and contains dialogue
+      const transcriptStartPattern = /Transcript of[^<]*<[^>]*>([\s\S]*?)(?:Author:|AI Translate|Translate this|Target Language|Most Used|Back Top)/i;
+      const match = html.match(transcriptStartPattern);
       
-      for (const pattern of transcriptPatterns) {
-        const matches = html.match(pattern);
-        if (matches) {
-          const transcriptContent = matches.join(' ').trim();
-          if (transcriptContent.length > 100) {
-            console.log('✅ Found transcript-like content');
-            return this.cleanTranscriptText(transcriptContent);
-          }
+      if (match && match[1]) {
+        console.log('✅ Found transcript content between title and UI elements');
+        const rawContent = match[1];
+        
+        // Clean up the content
+        const cleanContent = rawContent
+          .replace(/<[^>]*>/g, ' ') // Remove HTML tags
+          .replace(/&#34;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        if (cleanContent.length > 200) {
+          console.log(`✅ Extracted clean transcript (${cleanContent.length} chars)`);
+          return cleanContent;
         }
       }
       
-      // Look for transcript content in common containers
-      const patterns = [
-        // Look for textarea content (most common)
-        /<textarea[^>]*>([\s\S]*?)<\/textarea>/i,
-        // Look for div with transcript class/id
-        /<div[^>]*(?:class|id)="[^"]*transcript[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-        // Look for pre-formatted text
-        /<pre[^>]*>([\s\S]*?)<\/pre>/i,
-        // Look for main content area
-        /<main[^>]*>([\s\S]*?)<\/main>/i,
-        // Look for article content
-        /<article[^>]*>([\s\S]*?)<\/article>/i
-      ];
+      // Alternative: Look for content that contains dialogue patterns
+      const dialoguePattern = /(".*?"[\s\S]*?"[^"]*")/g;
+      const dialogueMatches = html.match(dialoguePattern);
       
-      for (const pattern of patterns) {
-        const matches = html.match(pattern);
-        if (matches && matches[1]) {
-          const content = matches[1];
-          
-          // Clean up HTML tags and decode entities
-          const cleanText = content
-            .replace(/<[^>]*>/g, ' ') // Remove HTML tags
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&quot;/g, '"')
-            .replace(/&#39;/g, "'")
-            .replace(/&#34;/g, '"') // Fix HTML entity for quotes
-            .replace(/&nbsp;/g, ' ')
-            .replace(/\s+/g, ' ') // Normalize whitespace
-            .trim();
-          
-          if (cleanText.length > 50) {
-            console.log(`✅ Found transcript in HTML (${cleanText.length} chars)`);
-            return this.cleanTranscriptText(cleanText);
-          }
+      if (dialogueMatches && dialogueMatches.length > 5) {
+        console.log('✅ Found dialogue patterns');
+        const dialogueContent = dialogueMatches.join(' ').trim();
+        
+        const cleanDialogue = dialogueContent
+          .replace(/<[^>]*>/g, ' ')
+          .replace(/&#34;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        if (cleanDialogue.length > 200) {
+          console.log(`✅ Extracted dialogue content (${cleanDialogue.length} chars)`);
+          return cleanDialogue;
         }
       }
       
-      // If no specific patterns match, try to extract all meaningful text
-      console.log('🔍 No specific patterns found, trying general text extraction...');
+      // Last resort: Look for any textarea or content area that might contain the transcript
+      const textareaPattern = /<textarea[^>]*>([\s\S]*?)<\/textarea>/i;
+      const textareaMatch = html.match(textareaPattern);
       
-      // Remove scripts, styles, and navigation elements
-      let cleanHtml = html
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
-        .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
-        .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
-      
-      // Extract text from remaining content
-      const textContent = cleanHtml
-        .replace(/<[^>]*>/g, ' ') // Remove HTML tags
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&#34;/g, '"') // Fix HTML entity for quotes
-        .replace(/&#x27;/g, "'") // Hex entity for apostrophe
-        .replace(/&#x22;/g, '"') // Hex entity for quote
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&hellip;/g, '...') // Ellipsis
-        .replace(/&mdash;/g, '—') // Em dash
-        .replace(/&ndash;/g, '–') // En dash
-        .replace(/\s+/g, ' ') // Normalize whitespace
-        .trim();
-      
-      // Filter out common UI text and find meaningful content
-      const lines = textContent.split(/[.!?]\s+/);
-      const meaningfulLines = lines.filter(line => 
-        line.trim().length > 20 && 
-        !line.toLowerCase().includes('cookie') &&
-        !line.toLowerCase().includes('privacy') &&
-        !line.toLowerCase().includes('terms') &&
-        !line.toLowerCase().includes('submit') &&
-        !line.toLowerCase().includes('button') &&
-        !line.toLowerCase().includes('loading') &&
-        !line.toLowerCase().includes('error') &&
-        !line.toLowerCase().includes('youtube') &&
-        !line.toLowerCase().includes('transcript') &&
-        !line.toLowerCase().includes('author:') &&
-        !line.toLowerCase().includes('like') &&
-        !line.toLowerCase().includes('subscribe') &&
-        !line.toLowerCase().includes('share') &&
-        !line.toLowerCase().includes('translate') &&
-        !line.toLowerCase().includes('ai translate') &&
-        !line.toLowerCase().includes('target language') &&
-        !line.toLowerCase().includes('select a language') &&
-        !line.toLowerCase().includes('translation completed') &&
-        !line.toLowerCase().includes('copy timestamp') &&
-        !line.toLowerCase().includes('show translation') &&
-        !line.toLowerCase().includes('show original') &&
-        !line.toLowerCase().includes('translation failed') &&
-        !line.toLowerCase().includes('pin video') &&
-        !line.toLowerCase().includes('&midot;') &&
-        !line.match(/^\d+$/) && // Not just numbers
-        !line.match(/^[0-9\s\-.]+$/) && // Not just numbers and symbols
-        !line.match(/^[^a-zA-Z]*$/) && // Must contain letters
-        line.includes(' ') // Must have spaces (multiple words)
-      );
-      
-      if (meaningfulLines.length > 0) {
-        const transcript = meaningfulLines.join('. ').trim();
-        if (transcript.length > 50) {
-          console.log(`✅ Extracted meaningful text (${transcript.length} chars)`);
-          return this.cleanTranscriptText(transcript);
+      if (textareaMatch && textareaMatch[1]) {
+        console.log('✅ Found textarea content');
+        const textareaContent = textareaMatch[1];
+        
+        // Clean and extract only the actual transcript part
+        const cleanTextarea = textareaContent
+          .replace(/<[^>]*>/g, ' ')
+          .replace(/&#34;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        // Try to find the actual transcript within the textarea
+        const transcriptInTextarea = /Transcript of[^<]*<[^>]*>([\s\S]*?)(?:Author:|AI Translate|Translate this|Target Language)/i.exec(cleanTextarea);
+        
+        if (transcriptInTextarea && transcriptInTextarea[1]) {
+          const finalTranscript = transcriptInTextarea[1].trim();
+          if (finalTranscript.length > 200) {
+            console.log(`✅ Extracted transcript from textarea (${finalTranscript.length} chars)`);
+            return finalTranscript;
+          }
+        }
+        
+        // If no specific pattern, return the cleaned textarea content if it's long enough
+        if (cleanTextarea.length > 500) {
+          console.log(`✅ Using full textarea content (${cleanTextarea.length} chars)`);
+          return cleanTextarea;
         }
       }
       
@@ -283,52 +236,6 @@ export class YouTubeTranscriptServiceV3 {
     throw new Error('Could not extract transcript from HTML response');
   }
 
-  // Clean and format transcript text
-  private cleanTranscriptText(text: string): string {
-    console.log('🧹 Cleaning transcript text...');
-    
-    return text
-      // Fix common HTML entities
-      .replace(/&#34;/g, '"') // HTML entity for quotes
-      .replace(/&#39;/g, "'") // HTML entity for apostrophe
-      .replace(/&#x27;/g, "'") // Hex entity for apostrophe
-      .replace(/&#x22;/g, '"') // Hex entity for quote
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&hellip;/g, '...')
-      .replace(/&mdash;/g, '—')
-      .replace(/&ndash;/g, '–')
-      
-      // Remove UI elements and metadata
-      .replace(/Author:\s*[^•]+•/gi, '')
-      .replace(/Like\s*•/gi, '')
-      .replace(/Subscribe\s*•/gi, '')
-      .replace(/Share\s*/gi, '')
-      .replace(/Transcript\s*Pin\s*video/gi, '')
-      .replace(/AI\s*Translate\s*Transcript/gi, '')
-      .replace(/Translate\s*this\s*transcript/gi, '')
-      .replace(/Target\s*Language/gi, '')
-      .replace(/Select\s*a\s*language/gi, '')
-      .replace(/Translation\s*completed/gi, '')
-      .replace(/Show\s*Translation/gi, '')
-      .replace(/Show\s*Original/gi, '')
-      .replace(/Translation\s*failed/gi, '')
-      .replace(/Copy\s*Timestamp/gi, '')
-      .replace(/&midot;/g, '')
-      
-      // Remove standalone numbers and symbols
-      .replace(/^\d+$/gm, '')
-      .replace(/^[0-9\s\-.]+$/gm, '')
-      .replace(/^[^a-zA-Z]*$/gm, '')
-      
-      // Normalize whitespace
-      .replace(/\s+/g, ' ')
-      .replace(/\n\s*\n/g, '\n')
-      .trim();
-  }
 
   // Parse JSON transcript format
   private parseTranscriptJSON(jsonText: string): string {
