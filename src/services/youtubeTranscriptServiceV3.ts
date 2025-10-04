@@ -88,56 +88,108 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // SINGLE METHOD: Public transcript API service
+  // SINGLE METHOD: Public transcript API service with fallbacks
   private async getTranscriptDirect(videoId: string): Promise<string> {
     console.log('🎯 SINGLE METHOD: Public transcript API service');
     
-    try {
-      // Use a public transcript API service
-      const apiUrl = `https://youtubetotranscript.com/transcript`;
-      const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      
-      console.log('🔍 Using public API:', apiUrl);
-      console.log('🔍 For video URL:', youtubeUrl);
-      
-      const formData = new URLSearchParams();
-      formData.append('youtube_url', youtubeUrl);
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Origin': 'https://youtubetotranscript.com',
-          'Referer': 'https://youtubetotranscript.com/'
-        },
-        body: formData
-      });
-
-      console.log('📡 Response status:', response.status);
-
-      if (response.ok) {
-        const html = await response.text();
-        console.log('📄 HTML response length:', html.length);
-        console.log('📄 HTML preview:', html.substring(0, 500));
+    // Try multiple public transcript services
+    const services = [
+      {
+        name: 'youtubetotranscript.com',
+        url: 'https://youtubetotranscript.com/transcript',
+        method: 'POST'
+      },
+      {
+        name: 'youtube-transcript-api',
+        url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
+        method: 'GET'
+      },
+      {
+        name: 'youtube-auto-subs',
+        url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`,
+        method: 'GET'
+      }
+    ];
+    
+    for (const service of services) {
+      try {
+        console.log(`🔍 Trying service: ${service.name}`);
         
-        if (html && html.trim().length > 0) {
-          const transcript = this.extractTranscriptFromHTML(html);
-          if (transcript && transcript.trim().length > 10) {
-            console.log('✅ SUCCESS: Transcript extracted via public API');
-            return transcript;
+        if (service.method === 'POST') {
+          const formData = new URLSearchParams();
+          formData.append('youtube_url', `https://www.youtube.com/watch?v=${videoId}`);
+          
+          const response = await fetch(service.url, {
+            method: 'POST',
+            headers: {
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Origin': 'https://youtubetotranscript.com',
+              'Referer': 'https://youtubetotranscript.com/'
+            },
+            body: formData
+          });
+
+          console.log(`📡 ${service.name} response status:`, response.status);
+
+          if (response.ok) {
+            const html = await response.text();
+            console.log(`📄 ${service.name} HTML response length:`, html.length);
+            
+            if (html && html.trim().length > 0) {
+              const transcript = this.extractTranscriptFromHTML(html);
+              if (transcript && transcript.trim().length > 100) {
+                console.log(`✅ SUCCESS: Transcript extracted via ${service.name}`);
+                return transcript;
+              }
+            }
+          }
+        } else if (service.method === 'GET') {
+          const response = await fetch(service.url, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json,text/plain,*/*',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+          });
+
+          console.log(`📡 ${service.name} response status:`, response.status);
+
+          if (response.ok) {
+            const data = await response.text();
+            console.log(`📄 ${service.name} response length:`, data.length);
+            
+            if (data && data.trim().length > 0) {
+              try {
+                const jsonData = JSON.parse(data);
+                if (jsonData.events && Array.isArray(jsonData.events)) {
+                  const transcript = jsonData.events
+                    .filter((event: any) => event.segs && Array.isArray(event.segs))
+                    .map((event: any) => event.segs.map((seg: any) => seg.utf8).join(''))
+                    .join(' ')
+                    .trim();
+                  
+                  if (transcript.length > 100) {
+                    console.log(`✅ SUCCESS: Transcript extracted via ${service.name}`);
+                    return transcript;
+                  }
+                }
+              } catch (parseError) {
+                console.log(`❌ ${service.name} JSON parse failed:`, parseError);
+              }
+            }
           }
         }
-      } else {
-        console.log('❌ Public API returned status:', response.status);
+        
+        console.log(`❌ ${service.name} failed`);
+      } catch (error) {
+        console.log(`❌ ${service.name} error:`, error);
       }
-    } catch (error) {
-      console.log('❌ Public API failed:', error);
     }
 
-    throw new Error('Public transcript API failed - no transcript found');
+    throw new Error('All transcript services failed - no transcript found');
   }
 
   // Extract transcript from HTML response
@@ -159,9 +211,8 @@ export class YouTubeTranscriptServiceV3 {
       
       console.log('🧹 Cleaned HTML and removed attributes');
       
-      // Look for the actual transcript content using a more precise pattern
-      // The transcript should start after "Transcript of" and contain the story
-      const transcriptPattern = /Transcript of[^"]*?([^"]*?)(?:\s*Author:|AI Translate|Translate this|Target Language|Most Used|Back Top|Help us improve|Generating Content|Finding this|Aces API|Fedback|Contact|Terms and Conditions|Privacy Policy|Change Cokie|YouTubeToTranscript|Get Fre|adsbygogle|Transform your transcript|AI responses|Most Used|No favorites|Find shareable|Comprehensive|Main takeaways|Memorable phrases|Clean Transcript|Micro Sumary|Short Sumary|Bulet Points|Long Sumary|Key Insights|Notable Quotes|Analysis|Learning and note|Flashcards|Concept Map|Q&A|Outline|Notes|Cornel Notes|Rapid Loging|T-Note Method|Charting Method|QEC Method|Content Creation|Social media|Viral Clips|Twiter Ideas|LinkedIn Article|Twiter Thread|Blog Article|Blog Outline|Twet Ideas|LinkedIn Post|Specialized|Advanced analysis|Speaker ID|AI Checker|Predictions|References|Main Idea|Proper Notes|AI-powered outputs|Clear al|d ctrl|Bokmark|sily lil tol|Just click|star|top bar|cmd|d That way|next time|transcript|you can find|us easily|without searching|again|Super handy|right|Close|Privacy Policy|It sems|our Consent Manager|CMP|couldn't load|properly|Close|Transcript copied|clipboard|We designed|Recapio|to be|the best way|to consume|YouTube videos|Generate key|takeaways|chapters|and shareable|notes fre|Sumarise|Oops|You found|a col feature|or Create|Acount)/i;
+      // Look for the actual transcript content - simplified pattern
+      const transcriptPattern = /Transcript of[^"]*?([^"]*?)(?:Author:|AI Translate|Transform your|Most Used|Back Top|Help us|Generating|Finding this|Aces API|Fedback|Contact|Terms|Privacy|Change Cokie|YouTubeToTranscript|Get Fre|adsbygogle)/i;
       
       const match = cleanHtml.match(transcriptPattern);
       
