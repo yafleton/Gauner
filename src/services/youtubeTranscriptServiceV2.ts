@@ -121,12 +121,12 @@ export class YouTubeTranscriptServiceV2 {
     };
   }
 
-  // Method 1: Direct YouTube API access
+  // Method 1: Direct YouTube API access with better headers
   private async fetchTranscriptDirect(videoId: string): Promise<string> {
     console.log('🎯 Trying direct YouTube API access...');
     
     // Try different language codes and formats
-    const languageCodes = ['en', 'en-US', 'en-GB', 'de', 'es', 'fr', 'auto'];
+    const languageCodes = ['en', 'en-US', 'en-GB', 'auto'];
     const formats = ['json3', 'srv3', 'ttml', 'vtt'];
 
     for (const lang of languageCodes) {
@@ -138,17 +138,24 @@ export class YouTubeTranscriptServiceV2 {
           const response = await fetch(url, {
             method: 'GET',
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
               'Accept': 'application/json, text/plain, */*',
               'Accept-Language': 'en-US,en;q=0.9',
+              'Accept-Encoding': 'gzip, deflate, br',
               'Referer': 'https://www.youtube.com/',
-              'Origin': 'https://www.youtube.com'
-            }
+              'Origin': 'https://www.youtube.com',
+              'Sec-Fetch-Dest': 'empty',
+              'Sec-Fetch-Mode': 'cors',
+              'Sec-Fetch-Site': 'same-origin',
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            },
+            credentials: 'omit'
           });
 
           if (response.ok) {
             const text = await response.text();
-            if (text && text.trim().length > 0) {
+            if (text && text.trim().length > 0 && !this.isErrorPage(text)) {
               const transcript = this.parseTranscriptText(text, format);
               if (transcript.trim().length > 10) {
                 console.log(`✅ Success with ${lang}/${format}`);
@@ -165,67 +172,64 @@ export class YouTubeTranscriptServiceV2 {
     throw new Error('Direct API access failed');
   }
 
-  // Method 2: Via specialized transcript services
+  // Method 2: Via CORS proxy with direct YouTube API
   private async fetchTranscriptViaProxy(videoId: string): Promise<string> {
-    console.log('🎯 Trying specialized transcript services...');
+    console.log('🎯 Trying CORS proxy with direct YouTube API...');
     
-    // Try dedicated transcript services that don't rely on direct YouTube API
-    const transcriptServices = [
-      {
-        name: 'youtube-transcript-api service',
-        url: `https://youtubetranscript.com/?server_vid2=${videoId}`,
-        proxy: 'https://api.allorigins.win/raw?url='
-      },
-      {
-        name: 'alternative transcript service',
-        url: `https://youtubetranscript.com/?server_vid=${videoId}`,
-        proxy: 'https://corsproxy.io/?'
-      },
-      {
-        name: 'simple transcript service',
-        url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
-        proxy: 'https://api.allorigins.win/raw?url='
-      }
+    // Try direct YouTube API through CORS proxies
+    const proxies = [
+      'https://api.allorigins.win/raw?url=',
+      'https://corsproxy.io/?',
+      'https://thingproxy.freeboard.io/fetch/'
     ];
 
-    for (const service of transcriptServices) {
-      try {
-        const proxiedUrl = service.proxy + encodeURIComponent(service.url);
-        console.log(`🔍 Trying ${service.name}: ${proxiedUrl}`);
-        
-        const response = await fetch(proxiedUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          }
-        });
+    const transcriptUrls = [
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=json3`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=auto&fmt=json3`
+    ];
 
-        if (response.ok) {
-          const text = await response.text();
-          console.log(`📄 Response from ${service.name}:`, text.substring(0, 200) + '...');
+    for (const proxy of proxies) {
+      for (const url of transcriptUrls) {
+        try {
+          const proxiedUrl = proxy + encodeURIComponent(url);
+          console.log(`🔍 Trying proxy: ${proxy} with ${url}`);
           
-          // Check if we got an error page instead of transcript
-          if (this.isErrorPage(text)) {
-            console.log(`⚠️ ${service.name} returned error page, skipping`);
-            continue;
-          }
-          
-          if (text && text.trim().length > 0) {
-            const transcript = this.parseTranscriptText(text);
-            if (transcript.trim().length > 10) {
-              console.log(`✅ Success with ${service.name}`);
-              return transcript;
+          const response = await fetch(proxiedUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json, text/plain, */*',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            }
+          });
+
+          if (response.ok) {
+            const text = await response.text();
+            console.log(`📄 Response from proxy:`, text.substring(0, 200) + '...');
+            
+            // Check if we got an error page instead of transcript
+            if (this.isErrorPage(text)) {
+              console.log(`⚠️ Proxy returned error page, skipping`);
+              continue;
+            }
+            
+            if (text && text.trim().length > 0) {
+              const transcript = this.parseTranscriptText(text);
+              if (transcript.trim().length > 10) {
+                console.log(`✅ Success with proxy: ${proxy}`);
+                return transcript;
+              }
             }
           }
+        } catch (error) {
+          console.warn(`❌ Proxy failed: ${proxy}`, error);
         }
-      } catch (error) {
-        console.warn(`❌ ${service.name} failed:`, error);
       }
     }
 
-    throw new Error('Specialized services failed');
+    throw new Error('CORS proxy method failed');
   }
 
   // Check if response is an error page
@@ -239,7 +243,18 @@ export class YouTubeTranscriptServiceV2 {
       'body { font-family: verdana',
       'background-color: #f',
       'color: #0',
-      'Gogle'
+      'Gogle',
+      'Please stop using a bot',
+      'Your bot is costing',
+      'YouTubeTranscript.com',
+      'youtube-transcript-api',
+      'Bite hören Sie auf',
+      'Ihr Bot kostet',
+      'CAPTCHA',
+      'blocked',
+      'access denied',
+      'forbidden',
+      'unauthorized'
     ];
     
     return errorIndicators.some(indicator => 
