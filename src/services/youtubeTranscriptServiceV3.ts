@@ -88,108 +88,57 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // WORKING TRANSCRIPT: Try multiple methods for youtube-transcript.io
+  // WORKING TRANSCRIPT: Use tubetranscript.com with CORS proxy
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 WORKING TRANSCRIPT: Trying multiple methods for youtube-transcript.io');
+    console.log('🎯 WORKING TRANSCRIPT: Using tubetranscript.com with CORS proxy');
     
-    // Method 1: Try direct access (might work if no auth needed)
     try {
-      console.log('🔍 Method 1: Direct API call');
-      const response = await fetch('https://www.youtube-transcript.io/api/transcripts/v2', {
-        method: 'POST',
-        headers: {
-          'Accept': '*/*',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ids: [videoId]
-        })
-      });
-
-      if (response.ok) {
-        const responseText = await response.text();
-        console.log('📄 Method 1 response:', responseText.substring(0, 200));
-        
-        if (responseText !== 'Unauthorized' && responseText.startsWith('{')) {
-          const responseData = JSON.parse(responseText);
-          const transcript = this.extractTranscriptFromResponse(responseData, videoId);
-          if (transcript) {
-            console.log('✅ Method 1 SUCCESS: Direct API worked');
-            return transcript;
-          }
-        }
-      }
-    } catch (error) {
-      console.log('❌ Method 1 failed:', error);
-    }
-
-    // Method 2: Try tubetranscript.com (simple GET request)
-    try {
-      console.log('🔍 Method 2: tubetranscript.com');
-      const response = await fetch(`https://www.tubetranscript.com/de/watch?v=${videoId}`, {
+      console.log('🔍 Using CORS proxy for tubetranscript.com');
+      const corsProxy = 'https://api.allorigins.win/raw?url=';
+      const targetUrl = `https://www.tubetranscript.com/de/watch?v=${videoId}`;
+      const proxiedUrl = `${corsProxy}${encodeURIComponent(targetUrl)}`;
+      
+      console.log('📹 Video ID:', videoId);
+      console.log('🌐 Proxied URL:', proxiedUrl);
+      
+      const response = await fetch(proxiedUrl, {
         method: 'GET',
         headers: {
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
           'Accept-Language': 'de-DE,de;q=0.9',
           'Cache-Control': 'max-age=0',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
-          'Referer': 'https://www.tubetranscript.com/de/'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
         }
       });
 
+      console.log('📡 API response status:', response.status);
+
       if (response.ok) {
         const htmlText = await response.text();
-        console.log('📄 Method 2 response length:', htmlText.length);
-        console.log('📄 Method 2 response preview:', htmlText.substring(0, 500));
+        console.log('📄 Response length:', htmlText.length);
+        console.log('📄 Response preview:', htmlText.substring(0, 500));
         
         // Extract transcript from HTML
         const transcript = this.extractTranscriptFromHTML(htmlText);
         if (transcript && transcript.length > 10) {
-          console.log('✅ Method 2 SUCCESS: tubetranscript.com worked');
+          console.log('✅ SUCCESS: tubetranscript.com worked');
+          console.log('📄 Transcript length:', transcript.length);
           console.log('📄 Transcript preview:', transcript.substring(0, 200));
           return transcript;
+        } else {
+          console.log('❌ No transcript found in HTML');
+          return `DEBUG: No transcript found in tubetranscript.com response for ${videoId}. Response length: ${htmlText.length}`;
         }
+      } else {
+        console.log('❌ Request failed:', response.status);
+        const errorText = await response.text().catch(() => 'Unknown error');
+        return `DEBUG: HTTP ${response.status} - ${errorText}`;
       }
+
     } catch (error) {
-      console.log('❌ Method 2 failed:', error);
+      console.log('❌ tubetranscript.com error:', error);
+      return `DEBUG: Network error - ${error}`;
     }
-
-    // Method 3: Try CORS proxy (as fallback)
-    try {
-      console.log('🔍 Method 3: CORS proxy fallback');
-      const corsProxy = 'https://api.allorigins.win/raw?url=';
-      const proxiedUrl = `${corsProxy}${encodeURIComponent('https://www.youtube-transcript.io/api/transcripts/v2')}`;
-      
-      const response = await fetch(proxiedUrl, {
-        method: 'POST',
-        headers: {
-          'Accept': '*/*',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ids: [videoId]
-        })
-      });
-
-      if (response.ok) {
-        const responseText = await response.text();
-        console.log('📄 Method 3 response:', responseText.substring(0, 200));
-        
-        if (responseText !== 'Unauthorized' && responseText.startsWith('{')) {
-          const responseData = JSON.parse(responseText);
-          const transcript = this.extractTranscriptFromResponse(responseData, videoId);
-          if (transcript) {
-            console.log('✅ Method 3 SUCCESS: CORS proxy worked');
-            return transcript;
-          }
-        }
-      }
-    } catch (error) {
-      console.log('❌ Method 3 failed:', error);
-    }
-
-    // All methods failed
-    return `DEBUG: All transcript methods failed for ${videoId}. The API requires authentication or is blocked.`;
   }
 
   // Helper method to extract transcript from response
