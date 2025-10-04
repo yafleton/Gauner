@@ -88,57 +88,78 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // MULTIPLE WORKING APIS METHOD: Try different working APIs systematically
+  // NEW FREE API METHOD: Try completely different free APIs
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 MULTIPLE WORKING APIS METHOD: Trying different working APIs systematically');
+    console.log('🎯 NEW FREE API METHOD: Trying completely different free APIs');
     
-    // List of working transcript APIs with CORS proxies to try
+    // List of completely new free transcript APIs to try
     const apis = [
       {
-        name: 'YouTube Transcript API (Vercel) via CORS Proxy',
-        url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`)}`,
+        name: 'YouTube Transcript API (GitHub Pages)',
+        url: `https://youtube-transcript-api.github.io/api/transcript?video_id=${videoId}`,
         headers: {
           'Accept': 'application/json'
         }
       },
       {
-        name: 'YouTube Transcript API (Heroku) via CORS Proxy',
-        url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`)}`,
+        name: 'Transcript API (Netlify)',
+        url: `https://youtube-transcript-api.netlify.app/api/transcript?video_id=${videoId}`,
         headers: {
           'Accept': 'application/json'
         }
       },
       {
-        name: 'Transcript API (Alternative) via CORS Proxy',
-        url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://api.vevioz.com/api/button/mp3/${videoId}`)}`,
+        name: 'Transcript Service (Render)',
+        url: `https://youtube-transcript-api.onrender.com/api/transcript?video_id=${videoId}`,
         headers: {
           'Accept': 'application/json'
         }
       },
       {
-        name: 'YouTube Transcript (GitHub) via CORS Proxy',
-        url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}&lang=en`)}`,
+        name: 'YouTube Transcript (Railway)',
+        url: `https://youtube-transcript-api.railway.app/api/transcript?video_id=${videoId}`,
         headers: {
           'Accept': 'application/json'
         }
       },
       {
-        name: 'Transcript Service (Netlify) via CORS Proxy',
-        url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}&lang=en`)}`,
+        name: 'Transcript API (Fly.io)',
+        url: `https://youtube-transcript-api.fly.dev/api/transcript?video_id=${videoId}`,
         headers: {
           'Accept': 'application/json'
         }
       },
       {
-        name: 'YouTube Transcript API (Vercel) via Alternative CORS Proxy',
-        url: `https://cors-anywhere.herokuapp.com/https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`,
+        name: 'YouTube Transcript (Glitch)',
+        url: `https://youtube-transcript-api.glitch.me/api/transcript?video_id=${videoId}`,
         headers: {
           'Accept': 'application/json'
         }
       },
       {
-        name: 'YouTube Transcript API (Heroku) via Alternative CORS Proxy',
-        url: `https://cors-anywhere.herokuapp.com/https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`,
+        name: 'Transcript Service (Replit)',
+        url: `https://youtube-transcript-api.replit.app/api/transcript?video_id=${videoId}`,
+        headers: {
+          'Accept': 'application/json'
+        }
+      },
+      {
+        name: 'YouTube Transcript (Surge)',
+        url: `https://youtube-transcript-api.surge.sh/api/transcript?video_id=${videoId}`,
+        headers: {
+          'Accept': 'application/json'
+        }
+      },
+      {
+        name: 'Transcript API (Now.sh)',
+        url: `https://youtube-transcript-api.now.sh/api/transcript?video_id=${videoId}`,
+        headers: {
+          'Accept': 'application/json'
+        }
+      },
+      {
+        name: 'YouTube Transcript (Firebase)',
+        url: `https://youtube-transcript-api.firebaseapp.com/api/transcript?video_id=${videoId}`,
         headers: {
           'Accept': 'application/json'
         }
@@ -227,7 +248,7 @@ export class YouTubeTranscriptServiceV3 {
       }
     }
 
-    throw new Error('All transcript APIs failed - no working service found');
+    throw new Error('All new free transcript APIs failed - no working service found');
   }
 
 
