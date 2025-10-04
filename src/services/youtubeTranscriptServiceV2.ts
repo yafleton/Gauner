@@ -125,15 +125,16 @@ export class YouTubeTranscriptServiceV2 {
   private async fetchTranscriptDirect(videoId: string): Promise<string> {
     console.log('🎯 Trying direct YouTube API access...');
     
-    // Try different language codes and formats
-    const languageCodes = ['en', 'en-US', 'en-GB', 'auto'];
+    // Try different language codes and formats, prioritizing auto-generated
+    const languageCodes = ['auto', 'en', 'en-US', 'en-GB', 'de', 'es', 'fr'];
     const formats = ['json3', 'srv3', 'ttml', 'vtt'];
 
     for (const lang of languageCodes) {
       for (const format of formats) {
         try {
-          const url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}&fmt=${format}`;
-          console.log(`🔍 Trying: ${lang} with format ${format}`);
+          // Try with auto-generated parameter first
+          const url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}&fmt=${format}&kind=asr`;
+          console.log(`🔍 Trying: ${lang} with format ${format} (auto-generated)`);
           
           const response = await fetch(url, {
             method: 'GET',
@@ -158,8 +159,41 @@ export class YouTubeTranscriptServiceV2 {
             if (text && text.trim().length > 0 && !this.isErrorPage(text)) {
               const transcript = this.parseTranscriptText(text, format);
               if (transcript.trim().length > 10) {
-                console.log(`✅ Success with ${lang}/${format}`);
+                console.log(`✅ Success with ${lang}/${format} (auto-generated)`);
                 return transcript;
+              }
+            }
+          }
+
+          // If auto-generated fails, try without kind parameter
+          const url2 = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}&fmt=${format}`;
+          console.log(`🔍 Trying: ${lang} with format ${format} (any)`);
+          
+          const response2 = await fetch(url2, {
+            method: 'GET',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'application/json, text/plain, */*',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'Referer': 'https://www.youtube.com/',
+              'Origin': 'https://www.youtube.com',
+              'Sec-Fetch-Dest': 'empty',
+              'Sec-Fetch-Mode': 'cors',
+              'Sec-Fetch-Site': 'same-origin',
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            },
+            credentials: 'omit'
+          });
+
+          if (response2.ok) {
+            const text2 = await response2.text();
+            if (text2 && text2.trim().length > 0 && !this.isErrorPage(text2)) {
+              const transcript2 = this.parseTranscriptText(text2, format);
+              if (transcript2.trim().length > 10) {
+                console.log(`✅ Success with ${lang}/${format} (any)`);
+                return transcript2;
               }
             }
           }
@@ -184,10 +218,19 @@ export class YouTubeTranscriptServiceV2 {
     ];
 
     const transcriptUrls = [
+      // Try auto-generated first
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=auto&fmt=json3&kind=asr`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=json3&kind=asr`,
+      // Then try without kind parameter
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=auto&fmt=json3`,
       `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`,
       `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=json3`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=auto&fmt=json3`
+      // Try other formats
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=auto&fmt=srv3&kind=asr`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3&kind=asr`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=auto&fmt=srv3`,
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`
     ];
 
     for (const proxy of proxies) {
@@ -266,6 +309,29 @@ export class YouTubeTranscriptServiceV2 {
   private async fetchTranscriptScraping(videoId: string): Promise<string> {
     console.log('🎯 Trying alternative scraping methods...');
     
+    // First, try to get available languages from the video page
+    try {
+      console.log('🔍 Trying to discover available languages...');
+      const availableLanguages = await this.discoverAvailableLanguages(videoId);
+      console.log('🌍 Discovered languages:', availableLanguages);
+      
+      // Try each discovered language
+      for (const lang of availableLanguages) {
+        try {
+          console.log(`🔍 Trying discovered language: ${lang}`);
+          const transcript = await this.fetchTranscriptForLanguage(videoId, lang);
+          if (transcript && transcript.trim().length > 10) {
+            console.log(`✅ Success with discovered language: ${lang}`);
+            return transcript;
+          }
+        } catch (error) {
+          console.warn(`❌ Failed with discovered language ${lang}:`, error);
+        }
+      }
+    } catch (error) {
+      console.warn('❌ Language discovery failed:', error);
+    }
+
     // Try different approaches that might work better
     const scrapingMethods = [
       {
@@ -277,11 +343,6 @@ export class YouTubeTranscriptServiceV2 {
         name: 'embed page parsing',
         url: `https://www.youtube.com/embed/${videoId}`,
         method: 'embed'
-      },
-      {
-        name: 'alternative transcript API',
-        url: `https://youtubetranscript.com/?server_vid2=${videoId}`,
-        method: 'api'
       }
     ];
 
@@ -334,6 +395,126 @@ export class YouTubeTranscriptServiceV2 {
     }
 
     throw new Error('All scraping methods failed');
+  }
+
+  // Discover available languages for a video
+  private async discoverAvailableLanguages(videoId: string): Promise<string[]> {
+    try {
+      const videoPageUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(videoPageUrl);
+      
+      const response = await fetch(proxyUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+        }
+      });
+
+      if (response.ok) {
+        const html = await response.text();
+        
+        // Extract available languages from the page
+        const languages: string[] = [];
+        
+        // Look for caption tracks in various formats
+        const patterns = [
+          /"captionTracks":\s*\[([^\]]+)\]/g,
+          /"captions":\s*{[^}]*"playerCaptionsTracklistRenderer":\s*{[^}]*"captionTracks":\s*\[([^\]]+)\]/g,
+          /"languageCode":"([^"]+)"/g,
+          /"vssId":"[^"]*([a-z]{2}(?:-[A-Z]{2})?)"/g
+        ];
+        
+        for (const pattern of patterns) {
+          const matches = html.match(pattern);
+          if (matches) {
+            matches.forEach(match => {
+              const langMatch = match.match(/"languageCode":"([^"]+)"/);
+              if (langMatch && !languages.includes(langMatch[1])) {
+                languages.push(langMatch[1]);
+              }
+            });
+          }
+        }
+        
+        // Add common fallbacks
+        const fallbacks = ['auto', 'en', 'en-US', 'en-GB', 'de', 'es', 'fr'];
+        fallbacks.forEach(lang => {
+          if (!languages.includes(lang)) {
+            languages.push(lang);
+          }
+        });
+        
+        return languages;
+      }
+    } catch (error) {
+      console.warn('❌ Language discovery failed:', error);
+    }
+    
+    // Fallback to common languages
+    return ['auto', 'en', 'en-US', 'en-GB', 'de', 'es', 'fr'];
+  }
+
+  // Fetch transcript for a specific language
+  private async fetchTranscriptForLanguage(videoId: string, language: string): Promise<string> {
+    const formats = ['json3', 'srv3', 'ttml', 'vtt'];
+    
+    for (const format of formats) {
+      try {
+        // Try with auto-generated parameter first
+        const url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${language}&fmt=${format}&kind=asr`;
+        console.log(`🔍 Trying ${language}/${format} with auto-generated`);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': 'https://www.youtube.com/',
+          }
+        });
+
+        if (response.ok) {
+          const text = await response.text();
+          if (text && text.trim().length > 0 && !this.isErrorPage(text)) {
+            const transcript = this.parseTranscriptText(text, format);
+            if (transcript.trim().length > 10) {
+              console.log(`✅ Success with ${language}/${format} (auto-generated)`);
+              return transcript;
+            }
+          }
+        }
+
+        // Try without kind parameter
+        const url2 = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${language}&fmt=${format}`;
+        console.log(`🔍 Trying ${language}/${format} without kind parameter`);
+        
+        const response2 = await fetch(url2, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': 'https://www.youtube.com/',
+          }
+        });
+
+        if (response2.ok) {
+          const text2 = await response2.text();
+          if (text2 && text2.trim().length > 0 && !this.isErrorPage(text2)) {
+            const transcript2 = this.parseTranscriptText(text2, format);
+            if (transcript2.trim().length > 10) {
+              console.log(`✅ Success with ${language}/${format} (any)`);
+              return transcript2;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`❌ Failed ${language}/${format}:`, error);
+      }
+    }
+    
+    throw new Error(`Failed to fetch transcript for language: ${language}`);
   }
 
   // Extract transcript from YouTube page HTML
