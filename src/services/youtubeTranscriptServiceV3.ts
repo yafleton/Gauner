@@ -88,13 +88,13 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // WORKING TRANSCRIPT: Use Cloudflare Worker with Python youtube-transcript-api
+  // WORKING TRANSCRIPT: Use Cloudflare Worker with external services
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 WORKING TRANSCRIPT: Using Cloudflare Worker with Python youtube-transcript-api');
+    console.log('🎯 WORKING TRANSCRIPT: Using Cloudflare Worker with external services');
     
     try {
-      // Use our Cloudflare Worker with Python
-      const workerUrl = 'https://youtube-transcript-worker.yafleton.workers.dev';
+      // Use our Cloudflare Worker (JavaScript version that calls external services)
+      const workerUrl = 'https://youtube-transcript-worker.danielfahmy02.workers.dev';
       const transcriptUrl = `${workerUrl}?video_id=${videoId}`;
       
       console.log('🔍 Calling Cloudflare Worker:', transcriptUrl);
@@ -119,7 +119,7 @@ export class YouTubeTranscriptServiceV3 {
           console.log(`✅ SUCCESS: Real transcript extracted via Cloudflare Worker`);
           console.log(`📄 Transcript length: ${transcript.length} characters`);
           console.log(`📄 Transcript preview: ${transcript.substring(0, 200)}...`);
-          console.log(`📊 Segments count: ${responseData.segments_count}`);
+          console.log(`🔧 Service used: ${responseData.service_used}`);
           
           return transcript;
         } else {
