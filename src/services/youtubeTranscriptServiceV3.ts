@@ -92,46 +92,55 @@ export class YouTubeTranscriptServiceV3 {
   private async getTranscriptDirect(videoId: string): Promise<string> {
     console.log('🎯 MULTIPLE WORKING APIS METHOD: Trying different working APIs systematically');
     
-    // List of working transcript APIs to try
+    // List of working transcript APIs with CORS proxies to try
     const apis = [
       {
-        name: 'YouTube Transcript API (Vercel)',
-        url: `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`,
+        name: 'YouTube Transcript API (Vercel) via CORS Proxy',
+        url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`)}`,
         headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'Accept': 'application/json'
         }
       },
       {
-        name: 'YouTube Transcript API (Heroku)',
-        url: `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`,
+        name: 'YouTube Transcript API (Heroku) via CORS Proxy',
+        url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`)}`,
         headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'Accept': 'application/json'
         }
       },
       {
-        name: 'Transcript API (Alternative)',
-        url: `https://api.vevioz.com/api/button/mp3/${videoId}`,
+        name: 'Transcript API (Alternative) via CORS Proxy',
+        url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://api.vevioz.com/api/button/mp3/${videoId}`)}`,
         headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'Accept': 'application/json'
         }
       },
       {
-        name: 'YouTube Transcript (GitHub)',
-        url: `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}&lang=en`,
+        name: 'YouTube Transcript (GitHub) via CORS Proxy',
+        url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}&lang=en`)}`,
         headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'Accept': 'application/json'
         }
       },
       {
-        name: 'Transcript Service (Netlify)',
-        url: `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}&lang=en`,
+        name: 'Transcript Service (Netlify) via CORS Proxy',
+        url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}&lang=en`)}`,
         headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'Accept': 'application/json'
+        }
+      },
+      {
+        name: 'YouTube Transcript API (Vercel) via Alternative CORS Proxy',
+        url: `https://cors-anywhere.herokuapp.com/https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`,
+        headers: {
+          'Accept': 'application/json'
+        }
+      },
+      {
+        name: 'YouTube Transcript API (Heroku) via Alternative CORS Proxy',
+        url: `https://cors-anywhere.herokuapp.com/https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`,
+        headers: {
+          'Accept': 'application/json'
         }
       }
     ];
