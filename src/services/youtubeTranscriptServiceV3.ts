@@ -116,8 +116,18 @@ export class YouTubeTranscriptServiceV3 {
       console.log('📡 API response status:', response.status);
 
       if (response.ok) {
-        const responseData = await response.json();
-        console.log('📄 API response data:', responseData);
+        const responseText = await response.text();
+        console.log('📄 Raw API response:', responseText.substring(0, 500));
+        
+        let responseData;
+        try {
+          responseData = JSON.parse(responseText);
+          console.log('📄 Parsed API response data:', responseData);
+        } catch (parseError) {
+          console.log('❌ JSON parse error:', parseError);
+          console.log('📄 Raw response (first 1000 chars):', responseText.substring(0, 1000));
+          return `DEBUG: JSON parse error - Response is not valid JSON. Raw response: ${responseText.substring(0, 500)}`;
+        }
 
         // Handle youtube-transcript.io response format
         let transcript = '';
