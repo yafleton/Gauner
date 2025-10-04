@@ -88,49 +88,153 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // SINGLE METHOD: Direct YouTube API call
+  // SINGLE METHOD: Public transcript API service
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 SINGLE METHOD: Direct YouTube API with auto-generated subtitles');
-    
-    // Try the most common auto-generated subtitle URL
-    const url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`;
-    
-    console.log('🔍 Trying URL:', url);
+    console.log('🎯 SINGLE METHOD: Public transcript API service');
     
     try {
-      const response = await fetch(url, {
-        method: 'GET',
+      // Use a public transcript API service
+      const apiUrl = `https://youtubetotranscript.com/transcript`;
+      const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      
+      console.log('🔍 Using public API:', apiUrl);
+      console.log('🔍 For video URL:', youtubeUrl);
+      
+      const formData = new URLSearchParams();
+      formData.append('youtube_url', youtubeUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'application/json, text/plain, */*',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': 'https://www.youtube.com/',
-          'Origin': 'https://www.youtube.com'
-        }
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Origin': 'https://youtubetotranscript.com',
+          'Referer': 'https://youtubetotranscript.com/'
+        },
+        body: formData
       });
 
       console.log('📡 Response status:', response.status);
 
       if (response.ok) {
-        const text = await response.text();
-        console.log('📄 Response length:', text.length);
-        console.log('📄 Response preview:', text.substring(0, 200));
+        const html = await response.text();
+        console.log('📄 HTML response length:', html.length);
+        console.log('📄 HTML preview:', html.substring(0, 500));
         
-        if (text && text.trim().length > 0) {
-          const transcript = this.parseTranscriptJSON(text);
+        if (html && html.trim().length > 0) {
+          const transcript = this.extractTranscriptFromHTML(html);
           if (transcript && transcript.trim().length > 10) {
-            console.log('✅ SUCCESS: Transcript extracted via direct API');
+            console.log('✅ SUCCESS: Transcript extracted via public API');
             return transcript;
           }
         }
       } else {
-        console.log('❌ API returned status:', response.status);
+        console.log('❌ Public API returned status:', response.status);
       }
     } catch (error) {
-      console.log('❌ Direct API failed:', error);
+      console.log('❌ Public API failed:', error);
     }
 
-    throw new Error('Direct YouTube API failed - no transcript found');
+    throw new Error('Public transcript API failed - no transcript found');
+  }
+
+  // Extract transcript from HTML response
+  private extractTranscriptFromHTML(html: string): string {
+    try {
+      console.log('🔍 Extracting transcript from HTML response...');
+      
+      // Look for transcript content in common containers
+      const patterns = [
+        // Look for textarea content (most common)
+        /<textarea[^>]*>([\s\S]*?)<\/textarea>/i,
+        // Look for div with transcript class/id
+        /<div[^>]*(?:class|id)="[^"]*transcript[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+        // Look for pre-formatted text
+        /<pre[^>]*>([\s\S]*?)<\/pre>/i,
+        // Look for main content area
+        /<main[^>]*>([\s\S]*?)<\/main>/i,
+        // Look for article content
+        /<article[^>]*>([\s\S]*?)<\/article>/i
+      ];
+      
+      for (const pattern of patterns) {
+        const matches = html.match(pattern);
+        if (matches && matches[1]) {
+          const content = matches[1];
+          
+          // Clean up HTML tags and decode entities
+          const cleanText = content
+            .replace(/<[^>]*>/g, ' ') // Remove HTML tags
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .trim();
+          
+          if (cleanText.length > 50) {
+            console.log(`✅ Found transcript in HTML (${cleanText.length} chars)`);
+            return cleanText;
+          }
+        }
+      }
+      
+      // If no specific patterns match, try to extract all meaningful text
+      console.log('🔍 No specific patterns found, trying general text extraction...');
+      
+      // Remove scripts, styles, and navigation elements
+      let cleanHtml = html
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+        .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+        .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
+      
+      // Extract text from remaining content
+      const textContent = cleanHtml
+        .replace(/<[^>]*>/g, ' ') // Remove HTML tags
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
+      
+      // Filter out common UI text and find meaningful content
+      const lines = textContent.split(/[.!?]\s+/);
+      const meaningfulLines = lines.filter(line => 
+        line.trim().length > 20 && 
+        !line.toLowerCase().includes('cookie') &&
+        !line.toLowerCase().includes('privacy') &&
+        !line.toLowerCase().includes('terms') &&
+        !line.toLowerCase().includes('submit') &&
+        !line.toLowerCase().includes('button') &&
+        !line.toLowerCase().includes('loading') &&
+        !line.toLowerCase().includes('error') &&
+        !line.toLowerCase().includes('youtube') &&
+        !line.toLowerCase().includes('transcript') &&
+        line.includes(' ') // Must have spaces (multiple words)
+      );
+      
+      if (meaningfulLines.length > 0) {
+        const transcript = meaningfulLines.join('. ').trim();
+        if (transcript.length > 50) {
+          console.log(`✅ Extracted meaningful text (${transcript.length} chars)`);
+          return transcript;
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error extracting transcript from HTML:', error);
+    }
+    
+    throw new Error('Could not extract transcript from HTML response');
   }
 
   // Parse JSON transcript format
