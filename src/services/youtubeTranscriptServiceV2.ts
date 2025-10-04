@@ -206,8 +206,71 @@ export class YouTubeTranscriptServiceV2 {
     throw new Error('Direct API access failed');
   }
 
-  // Method 2: Via CORS proxy with direct YouTube API
+  // Method 2: Via working transcript API service
   private async fetchTranscriptViaProxy(videoId: string): Promise<string> {
+    console.log('🎯 Trying working transcript API service...');
+    
+    try {
+      // Use the working youtubetotranscript.com API
+      const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      const apiUrl = 'https://youtubetotranscript.com/transcript';
+      
+      console.log(`🔍 Using youtubetotranscript.com API for: ${youtubeUrl}`);
+      
+      const formData = new URLSearchParams();
+      formData.append('youtube_url', youtubeUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+          'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+          'Origin': 'https://youtubetotranscript.com',
+          'Referer': 'https://youtubetotranscript.com/',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'same-origin',
+          'Sec-Fetch-User': '?1',
+          'Upgrade-Insecure-Requests': '1',
+          'Cache-Control': 'max-age=0',
+          'Priority': 'u=0, i'
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const html = await response.text();
+        console.log(`📄 Response from transcript API:`, html.substring(0, 300) + '...');
+        
+        // Check if we got an error page
+        if (this.isErrorPage(html)) {
+          console.log(`⚠️ Transcript API returned error page`);
+          throw new Error('Transcript API returned error page');
+        }
+        
+        // Extract transcript from the HTML response
+        const transcript = this.extractTranscriptFromApiResponse(html);
+        if (transcript && transcript.trim().length > 10) {
+          console.log(`✅ Success with transcript API service`);
+          return transcript;
+        }
+      }
+      
+      console.log(`❌ Transcript API failed with status: ${response.status}`);
+    } catch (error) {
+      console.warn(`❌ Transcript API failed:`, error);
+    }
+
+    // Fallback to CORS proxy with direct YouTube API
+    console.log('🔄 Falling back to CORS proxy method...');
+    return this.fetchTranscriptViaCorsProxy(videoId);
+  }
+
+  // Fallback CORS proxy method
+  private async fetchTranscriptViaCorsProxy(videoId: string): Promise<string> {
     console.log('🎯 Trying CORS proxy with direct YouTube API...');
     
     // Try direct YouTube API through CORS proxies
@@ -225,19 +288,14 @@ export class YouTubeTranscriptServiceV2 {
       // Then try without kind parameter
       `https://www.youtube.com/api/timedtext?v=${videoId}&lang=auto&fmt=json3`,
       `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=json3`,
-      // Try other formats
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=auto&fmt=srv3&kind=asr`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3&kind=asr`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=auto&fmt=srv3`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`
+      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=json3`
     ];
 
     for (const proxy of proxies) {
       for (const url of transcriptUrls) {
         try {
           const proxiedUrl = proxy + encodeURIComponent(url);
-          console.log(`🔍 Trying proxy: ${proxy} with ${url}`);
+          console.log(`🔍 Trying CORS proxy: ${proxy} with ${url}`);
           
           const response = await fetch(proxiedUrl, {
             method: 'GET',
@@ -250,29 +308,113 @@ export class YouTubeTranscriptServiceV2 {
 
           if (response.ok) {
             const text = await response.text();
-            console.log(`📄 Response from proxy:`, text.substring(0, 200) + '...');
+            console.log(`📄 Response from CORS proxy:`, text.substring(0, 200) + '...');
             
             // Check if we got an error page instead of transcript
             if (this.isErrorPage(text)) {
-              console.log(`⚠️ Proxy returned error page, skipping`);
+              console.log(`⚠️ CORS proxy returned error page, skipping`);
               continue;
             }
             
             if (text && text.trim().length > 0) {
               const transcript = this.parseTranscriptText(text);
               if (transcript.trim().length > 10) {
-                console.log(`✅ Success with proxy: ${proxy}`);
+                console.log(`✅ Success with CORS proxy: ${proxy}`);
                 return transcript;
               }
             }
           }
         } catch (error) {
-          console.warn(`❌ Proxy failed: ${proxy}`, error);
+          console.warn(`❌ CORS proxy failed: ${proxy}`, error);
         }
       }
     }
 
     throw new Error('CORS proxy method failed');
+  }
+
+  // Extract transcript from API response HTML
+  private extractTranscriptFromApiResponse(html: string): string {
+    try {
+      console.log('🔍 Extracting transcript from API response HTML...');
+      
+      // Look for transcript content in various possible containers
+      const transcriptPatterns = [
+        // Look for transcript in textarea or div
+        /<textarea[^>]*>([\s\S]*?)<\/textarea>/i,
+        /<div[^>]*class="[^"]*transcript[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+        /<div[^>]*id="[^"]*transcript[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+        // Look for content in pre tags
+        /<pre[^>]*>([\s\S]*?)<\/pre>/i,
+        // Look for content in specific containers
+        /<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+        /<div[^>]*class="[^"]*result[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+        // Look for text content in paragraphs
+        /<p[^>]*>([\s\S]*?)<\/p>/gi
+      ];
+      
+      for (const pattern of transcriptPatterns) {
+        const matches = html.match(pattern);
+        if (matches && matches[1]) {
+          const content = matches[1];
+          
+          // Clean up HTML tags and decode entities
+          const cleanText = content
+            .replace(/<[^>]*>/g, ' ') // Remove HTML tags
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .trim();
+          
+          if (cleanText.length > 50) { // Ensure we have meaningful content
+            console.log(`✅ Found transcript in HTML (${cleanText.length} chars)`);
+            return cleanText;
+          }
+        }
+      }
+      
+      // If no specific patterns match, try to extract all text content
+      const textContent = html
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove scripts
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove styles
+        .replace(/<[^>]*>/g, ' ') // Remove HTML tags
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
+      
+      // Look for meaningful text content (longer than typical UI text)
+      const lines = textContent.split(/[.!?]\s+/);
+      const meaningfulLines = lines.filter(line => 
+        line.trim().length > 20 && 
+        !line.toLowerCase().includes('cookie') &&
+        !line.toLowerCase().includes('privacy') &&
+        !line.toLowerCase().includes('terms') &&
+        !line.toLowerCase().includes('submit') &&
+        !line.toLowerCase().includes('button')
+      );
+      
+      if (meaningfulLines.length > 0) {
+        const transcript = meaningfulLines.join('. ').trim();
+        if (transcript.length > 50) {
+          console.log(`✅ Extracted transcript from general text content (${transcript.length} chars)`);
+          return transcript;
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error extracting transcript from API response:', error);
+    }
+    
+    throw new Error('Could not extract transcript from API response');
   }
 
   // Check if response is an error page
