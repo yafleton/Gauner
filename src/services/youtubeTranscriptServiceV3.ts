@@ -88,19 +88,76 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // WORKING TRANSCRIPT: Use youtube-transcript.io API
+  // WORKING TRANSCRIPT: Try multiple methods for youtube-transcript.io
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 WORKING TRANSCRIPT: Using youtube-transcript.io API');
+    console.log('🎯 WORKING TRANSCRIPT: Trying multiple methods for youtube-transcript.io');
     
+    // Method 1: Try direct access (might work if no auth needed)
     try {
-      // Use CORS proxy to bypass browser restrictions
-      const apiUrl = 'https://www.youtube-transcript.io/api/transcripts/v2';
+      console.log('🔍 Method 1: Direct API call');
+      const response = await fetch('https://www.youtube-transcript.io/api/transcripts/v2', {
+        method: 'POST',
+        headers: {
+          'Accept': '*/*',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ids: [videoId]
+        })
+      });
+
+      if (response.ok) {
+        const responseText = await response.text();
+        console.log('📄 Method 1 response:', responseText.substring(0, 200));
+        
+        if (responseText !== 'Unauthorized' && responseText.startsWith('{')) {
+          const responseData = JSON.parse(responseText);
+          const transcript = this.extractTranscriptFromResponse(responseData, videoId);
+          if (transcript) {
+            console.log('✅ Method 1 SUCCESS: Direct API worked');
+            return transcript;
+          }
+        }
+      }
+    } catch (error) {
+      console.log('❌ Method 1 failed:', error);
+    }
+
+    // Method 2: Try alternative transcript service
+    try {
+      console.log('🔍 Method 2: Alternative transcript service');
+      const response = await fetch(`https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('📄 Method 2 response:', responseData);
+        
+        let transcript = '';
+        if (Array.isArray(responseData)) {
+          transcript = responseData.map((item: any) => item.text || '').join(' ').trim();
+        } else if (responseData.transcript) {
+          transcript = responseData.transcript;
+        }
+        
+        if (transcript && transcript.length > 10) {
+          console.log('✅ Method 2 SUCCESS: Alternative service worked');
+          return transcript;
+        }
+      }
+    } catch (error) {
+      console.log('❌ Method 2 failed:', error);
+    }
+
+    // Method 3: Try CORS proxy (as fallback)
+    try {
+      console.log('🔍 Method 3: CORS proxy fallback');
       const corsProxy = 'https://api.allorigins.win/raw?url=';
-      const proxiedUrl = `${corsProxy}${encodeURIComponent(apiUrl)}`;
-      
-      console.log('🔍 Using CORS proxy for youtube-transcript.io API');
-      console.log('📹 Video ID:', videoId);
-      console.log('🌐 Proxied URL:', proxiedUrl);
+      const proxiedUrl = `${corsProxy}${encodeURIComponent('https://www.youtube-transcript.io/api/transcripts/v2')}`;
       
       const response = await fetch(proxiedUrl, {
         method: 'POST',
@@ -113,68 +170,50 @@ export class YouTubeTranscriptServiceV3 {
         })
       });
 
-      console.log('📡 API response status:', response.status);
-
       if (response.ok) {
         const responseText = await response.text();
-        console.log('📄 Raw API response:', responseText.substring(0, 500));
+        console.log('📄 Method 3 response:', responseText.substring(0, 200));
         
-        let responseData;
-        try {
-          responseData = JSON.parse(responseText);
-          console.log('📄 Parsed API response data:', responseData);
-        } catch (parseError) {
-          console.log('❌ JSON parse error:', parseError);
-          console.log('📄 Raw response (first 1000 chars):', responseText.substring(0, 1000));
-          return `DEBUG: JSON parse error - Response is not valid JSON. Raw response: ${responseText.substring(0, 500)}`;
-        }
-
-        // Handle youtube-transcript.io response format
-        let transcript = '';
-        
-        if (responseData && typeof responseData === 'object') {
-          // Look for transcript data in the response
-          if (responseData[videoId]) {
-            const videoData = responseData[videoId];
-            if (videoData.transcript) {
-              transcript = videoData.transcript;
-            } else if (videoData.segments && Array.isArray(videoData.segments)) {
-              // If it's segments format, join them
-              transcript = videoData.segments.map((segment: any) => 
-                segment.text || segment.content || ''
-              ).join(' ').trim();
-            }
-          } else if (responseData.transcript) {
-            transcript = responseData.transcript;
-          } else if (responseData.segments && Array.isArray(responseData.segments)) {
-            transcript = responseData.segments.map((segment: any) => 
-              segment.text || segment.content || ''
-            ).join(' ').trim();
+        if (responseText !== 'Unauthorized' && responseText.startsWith('{')) {
+          const responseData = JSON.parse(responseText);
+          const transcript = this.extractTranscriptFromResponse(responseData, videoId);
+          if (transcript) {
+            console.log('✅ Method 3 SUCCESS: CORS proxy worked');
+            return transcript;
           }
         }
-
-        if (transcript && transcript.length > 10) {
-          console.log(`✅ SUCCESS: Real transcript extracted via youtube-transcript.io`);
-          console.log(`📄 Transcript length: ${transcript.length} characters`);
-          console.log(`📄 Transcript preview: ${transcript.substring(0, 200)}...`);
-          
-          return transcript;
-        } else {
-          console.log('❌ API returned empty or invalid transcript');
-          console.log('📄 Raw response:', JSON.stringify(responseData, null, 2));
-          return `DEBUG: API returned empty/invalid transcript for ${videoId}. Raw response: ${JSON.stringify(responseData, null, 2)}`;
-        }
-      } else {
-        console.log('❌ API request failed:', response.status);
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.log('❌ Error response:', errorText);
-        return `DEBUG: HTTP ${response.status} - ${errorText}`;
       }
-
     } catch (error) {
-      console.log('❌ youtube-transcript.io API error:', error);
-      return `DEBUG: Network error - ${error}`;
+      console.log('❌ Method 3 failed:', error);
     }
+
+    // All methods failed
+    return `DEBUG: All transcript methods failed for ${videoId}. The API requires authentication or is blocked.`;
+  }
+
+  // Helper method to extract transcript from response
+  private extractTranscriptFromResponse(responseData: any, videoId: string): string | null {
+    if (responseData && typeof responseData === 'object') {
+      // Look for transcript data in the response
+      if (responseData[videoId]) {
+        const videoData = responseData[videoId];
+        if (videoData.transcript) {
+          return videoData.transcript;
+        } else if (videoData.segments && Array.isArray(videoData.segments)) {
+          // If it's segments format, join them
+          return videoData.segments.map((segment: any) => 
+            segment.text || segment.content || ''
+          ).join(' ').trim();
+        }
+      } else if (responseData.transcript) {
+        return responseData.transcript;
+      } else if (responseData.segments && Array.isArray(responseData.segments)) {
+        return responseData.segments.map((segment: any) => 
+          segment.text || segment.content || ''
+        ).join(' ').trim();
+      }
+    }
+    return null;
   }
 
   // Fallback method - return informative message (not used anymore, keeping for compatibility)
