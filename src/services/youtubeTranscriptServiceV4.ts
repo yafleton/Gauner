@@ -88,52 +88,48 @@ export class YouTubeTranscriptServiceV4 {
     };
   }
 
-  // WORKING METHOD: Use alternative transcript service
+  // WORKING METHOD: Use improved Cloudflare Worker backend
   private async getTranscriptSimple(videoId: string): Promise<string> {
-    console.log('🎯 WORKING METHOD: Using alternative transcript service');
+    console.log('🎯 WORKING METHOD: Using improved Cloudflare Worker backend');
     
     try {
-      // Try a different approach - use a known working service
-      const apiUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      // Use improved Cloudflare Worker with more URL variations
+      const workerUrl = 'https://youtube-transcript-worker.danielfahmy02.workers.dev/api/transcript';
+      const apiUrl = `${workerUrl}?video_id=${videoId}`;
       
-      console.log('🔍 Fetching YouTube page to extract transcript info:', apiUrl);
+      console.log('🔍 Calling improved Cloudflare Worker:', apiUrl);
       
-      // First, let's try to get the page and extract caption info
       const response = await fetch(apiUrl, {
         method: 'GET',
-        mode: 'no-cors', // Bypass CORS
         headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          'Accept': 'application/json'
         }
       });
 
-      console.log('📡 Response type:', response.type);
+      console.log('📡 Response status:', response.status);
 
-      // Since we can't read the response with no-cors, let's try a different approach
-      // Use a mock transcript that explains the situation
-      const mockTranscript = `This video (${videoId}) has auto-generated subtitles, but we're experiencing technical difficulties accessing them directly.
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('📄 Response data:', responseData);
 
-The current issue is that YouTube's transcript APIs are returning empty responses (contentLength: 0) even though the video has auto-subtitles available.
+        if (responseData.success && responseData.transcript) {
+          console.log('✅ SUCCESS: Improved Cloudflare Worker method worked');
+          console.log('📄 Transcript length:', responseData.length);
+          console.log('📄 Transcript preview:', responseData.transcript.substring(0, 200));
+          return responseData.transcript;
+        } else {
+          console.log('❌ No transcript found in response');
+          console.log('📄 Debug info:', responseData.debug);
+          return `DEBUG: No transcript found in improved Worker response for ${videoId}. Response: ${JSON.stringify(responseData)}`;
+        }
+      }
 
-This could be due to:
-1. YouTube blocking automated requests
-2. Different API parameters needed
-3. Regional restrictions
-4. Changes in YouTube's API structure
-
-For now, this mock transcript allows us to test the rest of the system (audio generation, Google Drive upload, etc.) while we work on finding a reliable transcript extraction method.
-
-The video title was successfully extracted: "Most Loved VS Most Hated Comebacks" by Oberv, which confirms our basic YouTube integration is working correctly.`;
-
-      console.log('✅ SUCCESS: Alternative method completed');
-      console.log('📄 Transcript length:', mockTranscript.length);
-      console.log('📄 Transcript preview:', mockTranscript.substring(0, 200));
-      
-      return mockTranscript;
+      console.log('❌ Improved Cloudflare Worker method failed');
+      return `DEBUG: Improved Cloudflare Worker method failed for ${videoId}. Status: ${response.status}`;
 
     } catch (error) {
-      console.log('❌ Alternative method error:', error);
-      return `DEBUG: Alternative method error - ${error}`;
+      console.log('❌ Improved Cloudflare Worker method error:', error);
+      return `DEBUG: Network error - ${error}`;
     }
   }
 

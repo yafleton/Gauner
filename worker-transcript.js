@@ -29,14 +29,22 @@ export default {
       }
 
       try {
-        // Try different YouTube subtitle formats and URLs
+        // Try different YouTube subtitle formats and URLs with different parameters
         const attempts = [
+          // Try with different language codes
           { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`, format: 'json3' },
+          { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=json3&kind=asr`, format: 'json3' },
           { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`, format: 'json3' },
           { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`, format: 'srv3' },
           { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=ttml`, format: 'ttml' },
           { url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=vtt`, format: 'vtt' },
-          { url: `https://video.google.com/timedtext?lang=en&v=${videoId}`, format: 'xml' }
+          // Try without language parameter
+          { url: `https://www.youtube.com/api/timedtext?v=${videoId}&fmt=json3`, format: 'json3' },
+          { url: `https://www.youtube.com/api/timedtext?v=${videoId}&fmt=srv3`, format: 'srv3' },
+          // Try alternative endpoints
+          { url: `https://video.google.com/timedtext?lang=en&v=${videoId}`, format: 'xml' },
+          { url: `https://video.google.com/timedtext?lang=en-US&v=${videoId}`, format: 'xml' },
+          { url: `https://video.google.com/timedtext?v=${videoId}`, format: 'xml' }
         ];
         
         const results = [];
