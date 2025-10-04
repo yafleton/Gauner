@@ -26,7 +26,7 @@ export interface ScriptAnalysis {
 export class GeminiService {
   private static instance: GeminiService;
   private apiKey: string = 'AIzaSyBobrL923Yn-gli8SvDj_ijxB5J7BSuaVE';
-  private baseUrl: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  private baseUrl: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent';
 
   public static getInstance(): GeminiService {
     if (!GeminiService.instance) {
@@ -193,6 +193,7 @@ Original transcript: "${transcript}"`;
         topK: 40,
         topP: 0.95,
         maxOutputTokens: 8192,
+        candidateCount: 1,
       },
       safetySettings: [
         {

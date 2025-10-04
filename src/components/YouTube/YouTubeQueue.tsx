@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Play, Trash2, RefreshCw, Download, AlertCircle, CheckCircle, Clock, Wand2, FileText, Youtube } from 'lucide-react';
-import { youtubeTranscriptService } from '../../services/youtubeTranscriptService';
+import { youtubeTranscriptServiceV2 } from '../../services/youtubeTranscriptServiceV2';
 import { geminiService } from '../../services/geminiService';
 import { queueService, QueueItem, QueueStats } from '../../services/queueService';
 import { ScriptAnalysis } from '../../services/geminiService';
@@ -78,7 +78,7 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
       return;
     }
 
-    if (!youtubeTranscriptService.isValidYouTubeUrl(youtubeUrl)) {
+    if (!youtubeTranscriptServiceV2.isValidYouTubeUrl(youtubeUrl)) {
       setError('Please enter a valid YouTube URL');
       return;
     }
@@ -88,7 +88,7 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
 
     try {
       console.log('🎥 Extracting transcript from:', youtubeUrl);
-      const result = await youtubeTranscriptService.extractTranscript(youtubeUrl);
+      const result = await youtubeTranscriptServiceV2.extractTranscript(youtubeUrl);
       
       console.log('✅ Transcript extracted:', result);
       
@@ -104,19 +104,9 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
         originalTranscript: result.transcript
       });
 
-      // Auto-translate if not English
-      if (selectedLanguage.toLowerCase() !== 'english') {
-        console.log('🌍 Translating content to', selectedLanguage);
-        const translatedTitle = await geminiService.translateTitle(result.title, selectedLanguage);
-        const translatedTranscript = await geminiService.translateTranscript(cleanedTranscript, selectedLanguage);
-        
-        setExtractedData({
-          title: translatedTitle,
-          transcript: translatedTranscript,
-          originalTitle: result.title,
-          originalTranscript: result.transcript
-        });
-      }
+      // Auto-translation temporarily disabled for testing
+      // TODO: Re-enable after transcript extraction is improved
+      console.log('🌍 Auto-translation disabled for testing');
 
       setError('');
     } catch (error) {
