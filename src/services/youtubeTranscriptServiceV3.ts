@@ -88,57 +88,120 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // YT-DLP METHOD: Use Cloudflare Worker for yt-dlp auto-subs extraction
+  // DIRECT YT-DLP METHOD: Use multiple yt-dlp services directly
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 YT-DLP METHOD: Using Cloudflare Worker for auto-subs extraction');
+    console.log('🎯 DIRECT YT-DLP METHOD: Using multiple yt-dlp services directly');
     
-    try {
-      // Use Cloudflare Worker for yt-dlp transcript extraction
-      const workerUrl = `https://yt-dlp-transcript-worker.yafleton.workers.dev/api/transcript/${videoId}`;
+    // List of yt-dlp based services to try
+    const services = [
+      `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`,
+      `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`,
+      `https://api.vevioz.com/api/button/mp3/${videoId}`,
+      `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}&lang=en`,
+      `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}&lang=en`
+    ];
+    
+    for (let i = 0; i < services.length; i++) {
+      const serviceUrl = services[i];
       
-      console.log('🔍 Using Cloudflare Worker:', workerUrl);
-      
-      const response = await fetch(workerUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json,*/*'
-        }
-      });
-
-      console.log('📡 Worker response status:', response.status);
-
-      if (response.ok) {
-        const jsonData = await response.text();
-        console.log('📄 Worker response length:', jsonData.length);
+      try {
+        console.log(`🔍 Trying service ${i + 1}/${services.length}: ${serviceUrl}`);
         
-        if (jsonData && jsonData.trim().length > 0) {
-          try {
-            const data = JSON.parse(jsonData);
-            console.log('🔍 Worker response:', data);
-            
-            if (data.transcript && data.transcript.length > 50) {
-              console.log('✅ SUCCESS: Auto-subs extracted via Cloudflare Worker');
-              return data.transcript;
-            } else {
-              console.log('❌ Worker transcript too short:', data.transcript?.length || 0);
-              console.log('🔍 Worker error:', data.error || 'Unknown error');
+        const response = await fetch(serviceUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json,*/*',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          }
+        });
+
+        console.log(`📡 Service ${i + 1} response status:`, response.status);
+
+        if (response.ok) {
+          const jsonData = await response.text();
+          console.log(`📄 Service ${i + 1} response length:`, jsonData.length);
+          
+          if (jsonData && jsonData.trim().length > 0) {
+            try {
+              const data = JSON.parse(jsonData);
+              console.log(`🔍 Service ${i + 1} response structure:`, typeof data, Array.isArray(data) ? `Array(${data.length})` : Object.keys(data));
+              
+              // Extract transcript from various formats
+              let transcript = '';
+              
+              // Method 1: Direct array
+              if (Array.isArray(data) && data.length > 0) {
+                transcript = data
+                  .map((entry: any) => {
+                    if (typeof entry === 'string') return entry;
+                    if (entry.text) return entry.text;
+                    if (entry.content) return entry.content;
+                    if (entry.transcript) return entry.transcript;
+                    return '';
+                  })
+                  .filter((text: string) => text.trim().length > 0)
+                  .join(' ')
+                  .replace(/\s+/g, ' ')
+                  .trim();
+              }
+              
+              // Method 2: Nested transcript
+              else if (data.transcript && Array.isArray(data.transcript)) {
+                transcript = data.transcript
+                  .map((entry: any) => {
+                    if (typeof entry === 'string') return entry;
+                    if (entry.text) return entry.text;
+                    if (entry.content) return entry.content;
+                    return '';
+                  })
+                  .filter((text: string) => text.trim().length > 0)
+                  .join(' ')
+                  .replace(/\s+/g, ' ')
+                  .trim();
+              }
+              
+              // Method 3: Single text field
+              else if (data.text) {
+                transcript = data.text.trim();
+              }
+              
+              // Method 4: Content field
+              else if (data.content) {
+                transcript = data.content.trim();
+              }
+              
+              // Method 5: Look for any string value
+              else {
+                const stringValues = Object.values(data).filter(value => 
+                  typeof value === 'string' && value.trim().length > 50
+                );
+                if (stringValues.length > 0) {
+                  transcript = stringValues.join(' ').trim();
+                }
+              }
+              
+              if (transcript.length > 50) {
+                console.log(`✅ SUCCESS: Auto-subs extracted via service ${i + 1}`);
+                return transcript;
+              } else {
+                console.log(`❌ Service ${i + 1} transcript too short:`, transcript.length);
+              }
+            } catch (parseError) {
+              console.log(`❌ Service ${i + 1} JSON parse failed:`, parseError);
+              console.log(`📄 Service ${i + 1} raw response preview:`, jsonData.substring(0, 200));
             }
-          } catch (parseError) {
-            console.log('❌ Worker JSON parse failed:', parseError);
-            console.log('📄 Raw worker response:', jsonData);
+          } else {
+            console.log(`❌ Service ${i + 1} empty response`);
           }
         } else {
-          console.log('❌ Empty worker response');
+          console.log(`❌ Service ${i + 1} returned status:`, response.status);
         }
-      } else {
-        const errorText = await response.text();
-        console.log('❌ Worker returned error:', response.status, errorText);
+      } catch (serviceError) {
+        console.log(`❌ Service ${i + 1} error:`, serviceError);
       }
-    } catch (error) {
-      console.log('❌ Cloudflare Worker method failed:', error);
     }
 
-    throw new Error('Cloudflare Worker method failed - no auto-subs found');
+    throw new Error('All yt-dlp services failed - no auto-subs found');
   }
 
   // Parse XML captions
