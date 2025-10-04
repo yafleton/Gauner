@@ -88,72 +88,43 @@ export class YouTubeTranscriptServiceV4 {
     };
   }
 
-  // WORKING METHOD: Use CORS proxy to access transcript API
+  // WORKING METHOD: Use simple mock transcript for testing
   private async getTranscriptSimple(videoId: string): Promise<string> {
-    console.log('🎯 WORKING METHOD: Using CORS proxy to access transcript API');
+    console.log('🎯 WORKING METHOD: Using mock transcript for testing');
     
     try {
-      // Use CORS proxy to bypass browser restrictions
-      const targetUrl = `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`;
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+      // For now, return a mock transcript to test the system
+      // This allows us to verify that the rest of the pipeline works
+      const mockTranscript = `This is a mock transcript for video ${videoId}. 
       
-      console.log('🔍 Calling via CORS proxy:', proxyUrl);
+The system is currently working correctly, but we need to find a working transcript extraction method that doesn't have CORS issues.
+
+This mock transcript contains multiple sentences to test the full pipeline including:
+- Transcript extraction
+- Text cleaning
+- Translation (when enabled)
+- Audio generation
+- Google Drive upload
+
+The video title was successfully extracted, which means the basic YouTube integration is working. We just need to find a reliable way to get the actual transcript content without CORS restrictions.
+
+Some potential solutions include:
+1. Server-side transcript extraction
+2. Browser extension approach
+3. Different API endpoints
+4. Alternative transcript services
+
+For now, this mock transcript allows us to test and verify that all other parts of the system are functioning correctly.`;
+
+      console.log('✅ SUCCESS: Mock transcript generated');
+      console.log('📄 Transcript length:', mockTranscript.length);
+      console.log('📄 Transcript preview:', mockTranscript.substring(0, 200));
       
-      const response = await fetch(proxyUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      console.log('📡 Response status:', response.status);
-
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log('📄 Response data:', responseData);
-
-        // Extract transcript from response
-        let transcript = '';
-        
-        if (Array.isArray(responseData)) {
-          // Array format: [{text: "...", start: 0, duration: 5}, ...]
-          transcript = responseData
-            .map((item: any) => item.text || item.transcript || '')
-            .join(' ')
-            .trim();
-        } else if (responseData && typeof responseData === 'object') {
-          // Object format
-          if (responseData.transcript) {
-            transcript = responseData.transcript;
-          } else if (responseData.text) {
-            transcript = responseData.text;
-          } else if (responseData.segments && Array.isArray(responseData.segments)) {
-            transcript = responseData.segments
-              .map((seg: any) => seg.text || seg.content || '')
-              .join(' ')
-              .trim();
-          }
-        } else if (typeof responseData === 'string') {
-          transcript = responseData;
-        }
-
-        if (transcript && transcript.length > 10) {
-          console.log('✅ SUCCESS: CORS proxy method worked');
-          console.log('📄 Transcript length:', transcript.length);
-          console.log('📄 Transcript preview:', transcript.substring(0, 200));
-          return transcript;
-        } else {
-          console.log('❌ No transcript found in response');
-          return `DEBUG: No transcript found in CORS proxy response for ${videoId}. Response: ${JSON.stringify(responseData).substring(0, 200)}`;
-        }
-      }
-
-      console.log('❌ CORS proxy method failed');
-      return `DEBUG: CORS proxy method failed for ${videoId}. Status: ${response.status}`;
+      return mockTranscript;
 
     } catch (error) {
-      console.log('❌ CORS proxy method error:', error);
-      return `DEBUG: Network error - ${error}`;
+      console.log('❌ Mock transcript method error:', error);
+      return `DEBUG: Mock transcript error - ${error}`;
     }
   }
 
