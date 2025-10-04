@@ -71,7 +71,7 @@ export class YouTubeTranscriptServiceV3 {
     // Get video information
     const videoInfo = await this.getVideoInfo(videoId);
 
-    // ONLY ONE METHOD: Direct YouTube API with auto-generated subtitles
+    // ONLY ONE METHOD: External public API
     const transcript = await this.getTranscriptDirect(videoId);
 
     if (!transcript || transcript.trim().length < 10) {
@@ -88,18 +88,17 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // WORKING TRANSCRIPT: Use Railway-hosted YouTube Transcript API
+  // SIMPLE TRANSCRIPT: Use external public API
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 WORKING TRANSCRIPT: Using Railway-hosted YouTube Transcript API');
+    console.log('🎯 SIMPLE TRANSCRIPT: Using external public API');
     
     try {
-      // Use our Railway-hosted API
-      const apiUrl = 'https://web-production-5c2a.up.railway.app';
-      const transcriptUrl = `${apiUrl}/transcript/${videoId}`;
+      // Try external public API
+      const apiUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
       
-      console.log('🔍 Calling Railway API:', transcriptUrl);
+      console.log('🔍 Calling external API:', apiUrl);
       
-      const response = await fetch(transcriptUrl, {
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -107,37 +106,46 @@ export class YouTubeTranscriptServiceV3 {
         }
       });
 
-      console.log('📡 Railway API response status:', response.status);
+      console.log('📡 API response status:', response.status);
 
       if (response.ok) {
         const responseData = await response.json();
-        console.log('📄 Railway API response data:', responseData);
+        console.log('📄 API response data:', responseData);
 
-        if (responseData.success && responseData.transcript) {
-          const transcript = responseData.transcript.trim();
-          
-          console.log(`✅ SUCCESS: Real transcript extracted via Railway API`);
+        // Handle different response formats
+        let transcript = '';
+        
+        if (Array.isArray(responseData)) {
+          // Array format: [{text: "...", start: 0, duration: 5}, ...]
+          transcript = responseData.map((item: any) => item.text || item.transcript || '').join(' ').trim();
+        } else if (responseData.transcript) {
+          // Object with transcript field
+          transcript = responseData.transcript;
+        } else if (responseData.text) {
+          // Object with text field
+          transcript = responseData.text;
+        } else if (typeof responseData === 'string') {
+          // Direct string
+          transcript = responseData;
+        }
+
+        if (transcript && transcript.length > 10) {
+          console.log(`✅ SUCCESS: Real transcript extracted via external API`);
           console.log(`📄 Transcript length: ${transcript.length} characters`);
           console.log(`📄 Transcript preview: ${transcript.substring(0, 200)}...`);
-          console.log(`🌍 Language used: ${responseData.language_used}`);
-          console.log(`📊 Segments count: ${responseData.segments_count}`);
           
           return transcript;
         } else {
-          console.log('❌ Railway API returned error:', responseData.detail || 'Unknown error');
-          return `Transcript extraction failed: ${responseData.detail || 'Unknown error'}`;
+          console.log('❌ API returned empty or invalid transcript');
+          return this.getFallbackMessage(videoId);
         }
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.log('❌ Railway API request failed:', response.status, errorData);
-        return `Transcript extraction failed: HTTP ${response.status} - ${errorData.detail || 'Unknown error'}`;
+        console.log('❌ API request failed:', response.status);
+        return this.getFallbackMessage(videoId);
       }
 
     } catch (error) {
-      console.log('❌ Railway API error:', error);
-      
-      // Fallback to informative message if Railway API fails
-      console.log('🔄 Railway API failed - returning informative message');
+      console.log('❌ External API error:', error);
       return this.getFallbackMessage(videoId);
     }
   }
@@ -146,18 +154,13 @@ export class YouTubeTranscriptServiceV3 {
   private getFallbackMessage(videoId: string): string {
     return `Transcript extraction failed for video ${videoId}. 
 
-The Railway API might be:
-❌ Starting up (first request takes 10-30 seconds)
+The external API might be:
 ❌ Temporarily unavailable
 ❌ Being blocked by YouTube
+❌ Video has no available transcripts
 
-Try again in a few seconds, or use the Voice tab to manually add your text.`;
+Try again later, or use the Voice tab to manually add your text.`;
   }
-
-
-
-
-
 
   // Validate YouTube URL
   isValidYouTubeUrl(url: string): boolean {
