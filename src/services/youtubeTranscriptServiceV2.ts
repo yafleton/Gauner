@@ -243,7 +243,7 @@ export class YouTubeTranscriptServiceV2 {
 
       if (response.ok) {
         const html = await response.text();
-        console.log(`📄 Response from transcript API:`, html.substring(0, 300) + '...');
+        console.log(`📄 Full response from transcript API:`, html);
         
         // Check if we got an error page
         if (this.isErrorPage(html)) {
@@ -251,11 +251,23 @@ export class YouTubeTranscriptServiceV2 {
           throw new Error('Transcript API returned error page');
         }
         
-        // Extract transcript from the HTML response
-        const transcript = this.extractTranscriptFromApiResponse(html);
-        if (transcript && transcript.trim().length > 10) {
-          console.log(`✅ Success with transcript API service`);
-          return transcript;
+        // Try to extract transcript from the HTML response
+        try {
+          const transcript = this.extractTranscriptFromApiResponse(html);
+          if (transcript && transcript.trim().length > 10) {
+            console.log(`✅ Success with transcript API service`);
+            return transcript;
+          }
+        } catch (extractError) {
+          console.log(`⚠️ Failed to extract from API response:`, extractError);
+        }
+        
+        // If extraction failed, try to find any text content
+        console.log(`🔍 Trying to find any meaningful content...`);
+        const anyText = this.extractAnyTextContent(html);
+        if (anyText && anyText.trim().length > 20) {
+          console.log(`✅ Found text content:`, anyText.substring(0, 200) + '...');
+          return anyText;
         }
       }
       
@@ -415,6 +427,99 @@ export class YouTubeTranscriptServiceV2 {
     }
     
     throw new Error('Could not extract transcript from API response');
+  }
+
+  // Extract any meaningful text content from HTML
+  private extractAnyTextContent(html: string): string {
+    try {
+      console.log('🔍 Extracting any meaningful text content...');
+      
+      // Remove scripts, styles, and other non-content elements
+      let cleanHtml = html
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+        .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+        .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+        .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
+      
+      // Extract text from all possible content containers
+      const contentPatterns = [
+        /<main[^>]*>([\s\S]*?)<\/main>/gi,
+        /<article[^>]*>([\s\S]*?)<\/article>/gi,
+        /<section[^>]*>([\s\S]*?)<\/section>/gi,
+        /<div[^>]*>([\s\S]*?)<\/div>/gi,
+        /<p[^>]*>([\s\S]*?)<\/p>/gi,
+        /<span[^>]*>([\s\S]*?)<\/span>/gi,
+        /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi
+      ];
+      
+      const allText: string[] = [];
+      
+      for (const pattern of contentPatterns) {
+        const matches = cleanHtml.match(pattern);
+        if (matches) {
+          matches.forEach(match => {
+            // Extract text content from each match
+            const textContent = match
+              .replace(/<[^>]*>/g, ' ') // Remove HTML tags
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&quot;/g, '"')
+              .replace(/&#39;/g, "'")
+              .replace(/&nbsp;/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+            
+            if (textContent.length > 10) {
+              allText.push(textContent);
+            }
+          });
+        }
+      }
+      
+      // Filter out common UI text and keep only meaningful content
+      const meaningfulText = allText.filter(text => 
+        text.length > 20 &&
+        !text.toLowerCase().includes('cookie') &&
+        !text.toLowerCase().includes('privacy') &&
+        !text.toLowerCase().includes('terms') &&
+        !text.toLowerCase().includes('submit') &&
+        !text.toLowerCase().includes('button') &&
+        !text.toLowerCase().includes('click') &&
+        !text.toLowerCase().includes('enter') &&
+        !text.toLowerCase().includes('youtube') &&
+        !text.toLowerCase().includes('transcript') &&
+        !text.toLowerCase().includes('loading') &&
+        !text.toLowerCase().includes('error') &&
+        !text.toLowerCase().includes('not found') &&
+        !text.match(/^[0-9\s\-.]+$/) && // Not just numbers
+        !text.match(/^[a-zA-Z\s]*$/) && // Not just single words
+        text.includes(' ') // Must have spaces (multiple words)
+      );
+      
+      if (meaningfulText.length > 0) {
+        // Join all meaningful text
+        const combinedText = meaningfulText.join(' ').trim();
+        
+        // Remove duplicates and clean up
+        const sentences = combinedText.split(/[.!?]+/).filter(s => s.trim().length > 10);
+        const uniqueSentences = [...new Set(sentences)];
+        
+        const finalText = uniqueSentences.join('. ').trim();
+        
+        if (finalText.length > 50) {
+          console.log(`✅ Extracted meaningful text (${finalText.length} chars):`, finalText.substring(0, 200) + '...');
+          return finalText;
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error extracting any text content:', error);
+    }
+    
+    throw new Error('Could not extract any meaningful text content');
   }
 
   // Check if response is an error page
