@@ -88,57 +88,13 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // WORKING TRANSCRIPT: Use Cloudflare Worker with external services
+  // WORKING TRANSCRIPT: Use external services directly (Worker not deployed yet)
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 WORKING TRANSCRIPT: Using Cloudflare Worker with external services');
+    console.log('🎯 WORKING TRANSCRIPT: Using external services directly (Worker not deployed yet)');
     
-    try {
-      // Use our Cloudflare Worker (JavaScript version that calls external services)
-      const workerUrl = 'https://youtube-transcript-worker.danielfahmy02.workers.dev';
-      const transcriptUrl = `${workerUrl}?video_id=${videoId}`;
-      
-      console.log('🔍 Calling Cloudflare Worker:', transcriptUrl);
-      
-      const response = await fetch(transcriptUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
-
-      console.log('📡 Worker response status:', response.status);
-
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log('📄 Worker response data:', responseData);
-
-        if (responseData.success && responseData.transcript) {
-          const transcript = responseData.transcript.trim();
-          
-          console.log(`✅ SUCCESS: Real transcript extracted via Cloudflare Worker`);
-          console.log(`📄 Transcript length: ${transcript.length} characters`);
-          console.log(`📄 Transcript preview: ${transcript.substring(0, 200)}...`);
-          console.log(`🔧 Service used: ${responseData.service_used}`);
-          
-          return transcript;
-        } else {
-          console.log('❌ Worker returned error:', responseData.error);
-          return `Transcript extraction failed: ${responseData.error || 'Unknown error'}`;
-        }
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.log('❌ Worker request failed:', response.status, errorData);
-        return `Transcript extraction failed: HTTP ${response.status} - ${errorData.error || 'Unknown error'}`;
-      }
-
-    } catch (error) {
-      console.log('❌ Cloudflare Worker error:', error);
-      
-      // Fallback to external services if worker fails
-      console.log('🔄 Falling back to external services...');
-      return await this.getTranscriptFallback(videoId);
-    }
+    // Go directly to external services since worker is not deployed
+    console.log('🔄 Using external services directly...');
+    return await this.getTranscriptFallback(videoId);
   }
 
   // Fallback method using external services
