@@ -88,21 +88,22 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // PUBLIC API METHOD: Use known working public transcript API
+  // DIFFERENT API METHOD: Use a different public transcript service
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 PUBLIC API METHOD: Using known working public transcript API');
+    console.log('🎯 DIFFERENT API METHOD: Using different public transcript service');
     
     try {
-      // Use a known working public transcript API
+      // Try a different public transcript API service
       const apiUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
       
-      console.log('🔍 Using public API:', apiUrl);
+      console.log('🔍 Using different public API:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json,*/*',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Origin': 'https://youtube-transcript-api.herokuapp.com'
         }
       });
 
@@ -111,63 +112,84 @@ export class YouTubeTranscriptServiceV3 {
       if (response.ok) {
         const jsonData = await response.text();
         console.log('📄 JSON response length:', jsonData.length);
+        console.log('📄 JSON response preview:', jsonData.substring(0, 200));
         
         if (jsonData && jsonData.trim().length > 0) {
           try {
             const data = JSON.parse(jsonData);
-            console.log('🔍 API response structure:', typeof data, Array.isArray(data) ? `Array(${data.length})` : Object.keys(data));
+            console.log('🔍 Full API response:', data);
             
-            // Handle different response formats
-            let transcriptArray = [];
+            // Try to extract transcript from any possible format
+            let transcript = '';
             
-            if (Array.isArray(data)) {
-              transcriptArray = data;
-            } else if (data.transcript && Array.isArray(data.transcript)) {
-              transcriptArray = data.transcript;
-            } else if (data.text) {
-              // Single text response
-              const transcript = data.text.trim();
-              if (transcript.length > 50) {
-                console.log('✅ SUCCESS: Transcript extracted as single text');
-                return transcript;
-              }
-            }
-            
-            if (transcriptArray.length > 0) {
-              const transcript = transcriptArray
-                .map((entry: any) => {
-                  if (typeof entry === 'string') return entry;
-                  if (entry.text) return entry.text;
-                  if (entry.content) return entry.content;
+            // Method 1: Direct array
+            if (Array.isArray(data) && data.length > 0) {
+              transcript = data
+                .map((item: any) => {
+                  if (typeof item === 'string') return item;
+                  if (item.text) return item.text;
+                  if (item.content) return item.content;
+                  if (item.transcript) return item.transcript;
                   return '';
                 })
                 .filter((text: string) => text.trim().length > 0)
                 .join(' ')
-                .replace(/\s+/g, ' ')
                 .trim();
-              
-              if (transcript.length > 50) {
-                console.log('✅ SUCCESS: Transcript extracted from array');
-                return transcript;
-              } else {
-                console.log('❌ Transcript too short:', transcript.length);
+            }
+            
+            // Method 2: Nested transcript
+            else if (data.transcript && Array.isArray(data.transcript)) {
+              transcript = data.transcript
+                .map((item: any) => {
+                  if (typeof item === 'string') return item;
+                  if (item.text) return item.text;
+                  if (item.content) return item.content;
+                  return '';
+                })
+                .filter((text: string) => text.trim().length > 0)
+                .join(' ')
+                .trim();
+            }
+            
+            // Method 3: Single text field
+            else if (data.text) {
+              transcript = data.text.trim();
+            }
+            
+            // Method 4: Content field
+            else if (data.content) {
+              transcript = data.content.trim();
+            }
+            
+            // Method 5: Look for any string value
+            else {
+              const stringValues = Object.values(data).filter(value => 
+                typeof value === 'string' && value.trim().length > 50
+              );
+              if (stringValues.length > 0) {
+                transcript = stringValues.join(' ').trim();
               }
+            }
+            
+            if (transcript.length > 50) {
+              console.log('✅ SUCCESS: Transcript extracted via different API method');
+              return transcript.replace(/\s+/g, ' ').trim();
             } else {
-              console.log('❌ No transcript array found in response');
+              console.log('❌ Transcript too short:', transcript.length);
             }
           } catch (parseError) {
             console.log('❌ JSON parse failed:', parseError);
-            console.log('📄 Raw response preview:', jsonData.substring(0, 500));
+            console.log('📄 Raw response:', jsonData);
           }
         } else {
           console.log('❌ Empty API response');
         }
       } else {
-        console.log('❌ Public API returned status:', response.status);
+        console.log('❌ Different API returned status:', response.status);
         
-        // Try alternative public service
-        const altApiUrl = `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`;
-        console.log('🔍 Trying alternative public API:', altApiUrl);
+        // Try another completely different service
+        const altApiUrl = `https://api.vevioz.com/api/button/mp3/${videoId}`;
+        console.log('🔍 Trying completely different API:', altApiUrl);
         
         const altResponse = await fetch(altApiUrl, {
           method: 'GET',
@@ -186,38 +208,14 @@ export class YouTubeTranscriptServiceV3 {
           if (altJsonData && altJsonData.trim().length > 0) {
             try {
               const altData = JSON.parse(altJsonData);
-              console.log('🔍 Alt API response structure:', typeof altData, Array.isArray(altData) ? `Array(${altData.length})` : Object.keys(altData));
+              console.log('🔍 Alt API response:', altData);
               
-              let altTranscriptArray = [];
-              
-              if (Array.isArray(altData)) {
-                altTranscriptArray = altData;
-              } else if (altData.transcript && Array.isArray(altData.transcript)) {
-                altTranscriptArray = altData.transcript;
-              } else if (altData.text) {
-                const transcript = altData.text.trim();
+              // Look for transcript in any field
+              if (altData.transcript || altData.subtitle || altData.caption) {
+                const transcript = (altData.transcript || altData.subtitle || altData.caption).trim();
                 if (transcript.length > 50) {
-                  console.log('✅ SUCCESS: Transcript extracted from alt API as single text');
-                  return transcript;
-                }
-              }
-              
-              if (altTranscriptArray.length > 0) {
-                const transcript = altTranscriptArray
-                  .map((entry: any) => {
-                    if (typeof entry === 'string') return entry;
-                    if (entry.text) return entry.text;
-                    if (entry.content) return entry.content;
-                    return '';
-                  })
-                  .filter((text: string) => text.trim().length > 0)
-                  .join(' ')
-                  .replace(/\s+/g, ' ')
-                  .trim();
-                
-                if (transcript.length > 50) {
-                  console.log('✅ SUCCESS: Transcript extracted from alt API array');
-                  return transcript;
+                  console.log('✅ SUCCESS: Transcript found in alt API');
+                  return transcript.replace(/\s+/g, ' ').trim();
                 }
               }
             } catch (altParseError) {
@@ -227,10 +225,10 @@ export class YouTubeTranscriptServiceV3 {
         }
       }
     } catch (error) {
-      console.log('❌ Public API method failed:', error);
+      console.log('❌ Different API method failed:', error);
     }
 
-    throw new Error('Public API method failed - no transcript found');
+    throw new Error('Different API method failed - no transcript found');
   }
 
   // Parse XML captions
