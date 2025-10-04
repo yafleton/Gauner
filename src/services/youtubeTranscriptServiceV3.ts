@@ -94,7 +94,7 @@ export class YouTubeTranscriptServiceV3 {
     
     try {
       // Use our Railway-hosted API
-      const apiUrl = 'https://youtube-transcript-api-production.up.railway.app';
+      const apiUrl = 'https://web-production-5c2a.up.railway.app';
       const transcriptUrl = `${apiUrl}/transcript/${videoId}`;
       
       console.log('🔍 Calling Railway API:', transcriptUrl);
