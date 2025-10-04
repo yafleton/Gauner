@@ -88,19 +88,17 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // SIMPLE METHOD: Use a simple public transcript service
+  // PUBLIC API METHOD: Use known working public transcript API
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 SIMPLE METHOD: Using simple public transcript service');
+    console.log('🎯 PUBLIC API METHOD: Using known working public transcript API');
     
     try {
-      // Use a simple CORS proxy to access YouTube transcript API
-      const proxyUrl = 'https://api.allorigins.win/raw?url=';
-      const transcriptUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`;
-      const fullUrl = proxyUrl + encodeURIComponent(transcriptUrl);
+      // Use a known working public transcript API
+      const apiUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
       
-      console.log('🔍 Using CORS proxy:', fullUrl);
+      console.log('🔍 Using public API:', apiUrl);
       
-      const response = await fetch(fullUrl, {
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json,*/*',
@@ -117,50 +115,69 @@ export class YouTubeTranscriptServiceV3 {
         if (jsonData && jsonData.trim().length > 0) {
           try {
             const data = JSON.parse(jsonData);
-            console.log('🔍 JSON data structure:', Object.keys(data));
+            console.log('🔍 API response structure:', typeof data, Array.isArray(data) ? `Array(${data.length})` : Object.keys(data));
             
-            if (data.events && Array.isArray(data.events)) {
-              const transcript = data.events
-                .filter((event: any) => event.segs && Array.isArray(event.segs))
-                .map((event: any) => event.segs.map((seg: any) => seg.utf8).join(''))
+            // Handle different response formats
+            let transcriptArray = [];
+            
+            if (Array.isArray(data)) {
+              transcriptArray = data;
+            } else if (data.transcript && Array.isArray(data.transcript)) {
+              transcriptArray = data.transcript;
+            } else if (data.text) {
+              // Single text response
+              const transcript = data.text.trim();
+              if (transcript.length > 50) {
+                console.log('✅ SUCCESS: Transcript extracted as single text');
+                return transcript;
+              }
+            }
+            
+            if (transcriptArray.length > 0) {
+              const transcript = transcriptArray
+                .map((entry: any) => {
+                  if (typeof entry === 'string') return entry;
+                  if (entry.text) return entry.text;
+                  if (entry.content) return entry.content;
+                  return '';
+                })
+                .filter((text: string) => text.trim().length > 0)
                 .join(' ')
                 .replace(/\s+/g, ' ')
                 .trim();
               
               if (transcript.length > 50) {
-                console.log('✅ SUCCESS: Transcript extracted via CORS proxy');
+                console.log('✅ SUCCESS: Transcript extracted from array');
                 return transcript;
               } else {
                 console.log('❌ Transcript too short:', transcript.length);
               }
             } else {
-              console.log('❌ No events array in JSON data');
+              console.log('❌ No transcript array found in response');
             }
           } catch (parseError) {
             console.log('❌ JSON parse failed:', parseError);
             console.log('📄 Raw response preview:', jsonData.substring(0, 500));
           }
         } else {
-          console.log('❌ Empty response from proxy');
+          console.log('❌ Empty API response');
         }
       } else {
-        console.log('❌ CORS proxy returned status:', response.status);
+        console.log('❌ Public API returned status:', response.status);
         
-        // Try alternative proxy
-        const altProxyUrl = 'https://cors-anywhere.herokuapp.com/';
-        const altFullUrl = altProxyUrl + transcriptUrl;
-        console.log('🔍 Trying alternative CORS proxy:', altFullUrl);
+        // Try alternative public service
+        const altApiUrl = `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`;
+        console.log('🔍 Trying alternative public API:', altApiUrl);
         
-        const altResponse = await fetch(altFullUrl, {
+        const altResponse = await fetch(altApiUrl, {
           method: 'GET',
           headers: {
             'Accept': 'application/json,*/*',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'X-Requested-With': 'XMLHttpRequest'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
           }
         });
 
-        console.log('📡 Alt proxy response status:', altResponse.status);
+        console.log('📡 Alt API response status:', altResponse.status);
 
         if (altResponse.ok) {
           const altJsonData = await altResponse.text();
@@ -169,17 +186,37 @@ export class YouTubeTranscriptServiceV3 {
           if (altJsonData && altJsonData.trim().length > 0) {
             try {
               const altData = JSON.parse(altJsonData);
+              console.log('🔍 Alt API response structure:', typeof altData, Array.isArray(altData) ? `Array(${altData.length})` : Object.keys(altData));
               
-              if (altData.events && Array.isArray(altData.events)) {
-                const transcript = altData.events
-                  .filter((event: any) => event.segs && Array.isArray(event.segs))
-                  .map((event: any) => event.segs.map((seg: any) => seg.utf8).join(''))
+              let altTranscriptArray = [];
+              
+              if (Array.isArray(altData)) {
+                altTranscriptArray = altData;
+              } else if (altData.transcript && Array.isArray(altData.transcript)) {
+                altTranscriptArray = altData.transcript;
+              } else if (altData.text) {
+                const transcript = altData.text.trim();
+                if (transcript.length > 50) {
+                  console.log('✅ SUCCESS: Transcript extracted from alt API as single text');
+                  return transcript;
+                }
+              }
+              
+              if (altTranscriptArray.length > 0) {
+                const transcript = altTranscriptArray
+                  .map((entry: any) => {
+                    if (typeof entry === 'string') return entry;
+                    if (entry.text) return entry.text;
+                    if (entry.content) return entry.content;
+                    return '';
+                  })
+                  .filter((text: string) => text.trim().length > 0)
                   .join(' ')
                   .replace(/\s+/g, ' ')
                   .trim();
                 
                 if (transcript.length > 50) {
-                  console.log('✅ SUCCESS: Transcript extracted via alternative CORS proxy');
+                  console.log('✅ SUCCESS: Transcript extracted from alt API array');
                   return transcript;
                 }
               }
@@ -190,10 +227,10 @@ export class YouTubeTranscriptServiceV3 {
         }
       }
     } catch (error) {
-      console.log('❌ CORS proxy method failed:', error);
+      console.log('❌ Public API method failed:', error);
     }
 
-    throw new Error('CORS proxy method failed - no transcript found');
+    throw new Error('Public API method failed - no transcript found');
   }
 
   // Parse XML captions
