@@ -88,209 +88,68 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // SINGLE METHOD: Public transcript API service with fallbacks
+  // SINGLE DIRECT METHOD: YouTube timedtext API
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 SINGLE METHOD: Public transcript API service');
+    console.log('🎯 SINGLE DIRECT METHOD: YouTube timedtext API');
     
-    // Try multiple public transcript services
-    const services = [
-      {
-        name: 'youtubetotranscript.com',
-        url: 'https://youtubetotranscript.com/transcript',
-        method: 'POST'
-      },
-      {
-        name: 'youtube-transcript-api',
-        url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
-        method: 'GET'
-      },
-      {
-        name: 'youtube-auto-subs',
-        url: `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`,
-        method: 'GET'
-      }
-    ];
-    
-    for (const service of services) {
-      try {
-        console.log(`🔍 Trying service: ${service.name}`);
-        
-        if (service.method === 'POST') {
-          const formData = new URLSearchParams();
-          formData.append('youtube_url', `https://www.youtube.com/watch?v=${videoId}`);
-          
-          const response = await fetch(service.url, {
-            method: 'POST',
-            headers: {
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.9',
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Origin': 'https://youtubetotranscript.com',
-              'Referer': 'https://youtubetotranscript.com/'
-            },
-            body: formData
-          });
-
-          console.log(`📡 ${service.name} response status:`, response.status);
-
-          if (response.ok) {
-            const html = await response.text();
-            console.log(`📄 ${service.name} HTML response length:`, html.length);
-            
-            if (html && html.trim().length > 0) {
-              const transcript = this.extractTranscriptFromHTML(html);
-              if (transcript && transcript.trim().length > 100) {
-                console.log(`✅ SUCCESS: Transcript extracted via ${service.name}`);
-                return transcript;
-              }
-            }
-          }
-        } else if (service.method === 'GET') {
-          const response = await fetch(service.url, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json,text/plain,*/*',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-          });
-
-          console.log(`📡 ${service.name} response status:`, response.status);
-
-          if (response.ok) {
-            const data = await response.text();
-            console.log(`📄 ${service.name} response length:`, data.length);
-            
-            if (data && data.trim().length > 0) {
-              try {
-                const jsonData = JSON.parse(data);
-                if (jsonData.events && Array.isArray(jsonData.events)) {
-                  const transcript = jsonData.events
-                    .filter((event: any) => event.segs && Array.isArray(event.segs))
-                    .map((event: any) => event.segs.map((seg: any) => seg.utf8).join(''))
-                    .join(' ')
-                    .trim();
-                  
-                  if (transcript.length > 100) {
-                    console.log(`✅ SUCCESS: Transcript extracted via ${service.name}`);
-                    return transcript;
-                  }
-                }
-              } catch (parseError) {
-                console.log(`❌ ${service.name} JSON parse failed:`, parseError);
-              }
-            }
-          }
-        }
-        
-        console.log(`❌ ${service.name} failed`);
-      } catch (error) {
-        console.log(`❌ ${service.name} error:`, error);
-      }
-    }
-
-    throw new Error('All transcript services failed - no transcript found');
-  }
-
-  // Extract transcript from HTML response
-  private extractTranscriptFromHTML(html: string): string {
     try {
-      console.log('🔍 Extracting transcript from HTML response...');
+      // Direct YouTube timedtext API call
+      const apiUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`;
       
-      // Remove all HTML tags, scripts, styles, and attributes first
-      let cleanHtml = html
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<[^>]*>/g, ' ') // Remove all HTML tags
-        .replace(/data-[^=]*="[^"]*"/gi, '') // Remove data attributes
-        .replace(/class="[^"]*"/gi, '') // Remove class attributes
-        .replace(/id="[^"]*"/gi, '') // Remove id attributes
-        .replace(/style="[^"]*"/gi, '') // Remove style attributes
-        .replace(/\s+/g, ' ') // Normalize whitespace
-        .trim();
+      console.log('🔍 Using direct YouTube API:', apiUrl);
       
-      console.log('🧹 Cleaned HTML and removed attributes');
-      
-      // Look for the actual transcript content - simplified pattern
-      const transcriptPattern = /Transcript of[^"]*?([^"]*?)(?:Author:|AI Translate|Transform your|Most Used|Back Top|Help us|Generating|Finding this|Aces API|Fedback|Contact|Terms|Privacy|Change Cokie|YouTubeToTranscript|Get Fre|adsbygogle)/i;
-      
-      const match = cleanHtml.match(transcriptPattern);
-      
-      if (match && match[1]) {
-        console.log('✅ Found transcript content');
-        const rawContent = match[1];
-        
-        // Clean up the content
-        const cleanContent = rawContent
-          .replace(/&#34;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/&quot;/g, '"')
-          .replace(/&amp;/g, '&')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/&midot;/g, '•')
-          .replace(/&hellip;/g, '...')
-          .replace(/&mdash;/g, '—')
-          .replace(/&ndash;/g, '–')
-          .replace(/\s+/g, ' ') // Normalize whitespace
-          .trim();
-        
-        // Filter out any remaining UI text and attributes
-        const finalContent = cleanContent
-          .replace(/Author:\s*[^•]+•/gi, '')
-          .replace(/Like\s*•/gi, '')
-          .replace(/Subscribe\s*•/gi, '')
-          .replace(/Share\s*/gi, '')
-          .replace(/Transcript\s*Pin\s*video/gi, '')
-          .replace(/AI\s*Translate\s*Transcript/gi, '')
-          .replace(/Translate\s*this\s*transcript/gi, '')
-          .replace(/Target\s*Language/gi, '')
-          .replace(/Select\s*a\s*language/gi, '')
-          .replace(/Translation\s*completed/gi, '')
-          .replace(/Show\s*Translation/gi, '')
-          .replace(/Show\s*Original/gi, '')
-          .replace(/Translation\s*failed/gi, '')
-          .replace(/Copy\s*Timestamp/gi, '')
-          .replace(/This wil cost/gi, '')
-          .replace(/credit\./gi, '')
-          .replace(/Select a language/gi, '')
-          .replace(/French|Italian|Dutch|Japanese|Chinese|Hindi|Swedish|Danish|Czech|Grek|Turkish|Thai|Malay|Romanian|Croatian|Slovak|Lithuanian|Estonian/gi, '')
-          .replace(/\s+/g, ' ')
-          .trim();
-        
-        if (finalContent.length > 500) {
-          console.log(`✅ Extracted clean transcript (${finalContent.length} chars)`);
-          return finalContent;
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json,text/plain,*/*',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
-      }
-      
-      // Alternative: Look for content that contains dialogue patterns with quotes
-      const dialoguePattern = /(".*?"[\s\S]*?"[^"]*")/g;
-      const dialogueMatches = cleanHtml.match(dialoguePattern);
-      
-      if (dialogueMatches && dialogueMatches.length > 15) {
-        console.log('✅ Found dialogue patterns');
-        const dialogueContent = dialogueMatches.join(' ').trim();
+      });
+
+      console.log('📡 Response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.text();
+        console.log('📄 Response length:', data.length);
         
-        const cleanDialogue = dialogueContent
-          .replace(/&#34;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/&quot;/g, '"')
-          .replace(/&amp;/g, '&')
-          .replace(/\s+/g, ' ')
-          .trim();
-        
-        if (cleanDialogue.length > 800) {
-          console.log(`✅ Extracted dialogue content (${cleanDialogue.length} chars)`);
-          return cleanDialogue;
+        if (data && data.trim().length > 0) {
+          try {
+            const jsonData = JSON.parse(data);
+            console.log('🔍 Parsed JSON data:', jsonData);
+            
+            if (jsonData.events && Array.isArray(jsonData.events)) {
+              const transcript = jsonData.events
+                .filter((event: any) => event.segs && Array.isArray(event.segs))
+                .map((event: any) => event.segs.map((seg: any) => seg.utf8).join(''))
+                .join(' ')
+                .trim();
+              
+              if (transcript.length > 50) {
+                console.log('✅ SUCCESS: Transcript extracted via direct YouTube API');
+                return transcript;
+              } else {
+                console.log('❌ Transcript too short:', transcript.length);
+              }
+            } else {
+              console.log('❌ No events array in JSON data');
+            }
+          } catch (parseError) {
+            console.log('❌ JSON parse failed:', parseError);
+            console.log('📄 Raw data preview:', data.substring(0, 500));
+          }
+        } else {
+          console.log('❌ Empty response data');
         }
+      } else {
+        console.log('❌ API returned status:', response.status);
       }
-      
     } catch (error) {
-      console.error('❌ Error extracting transcript from HTML:', error);
+      console.log('❌ Direct API failed:', error);
     }
-    
-    throw new Error('Could not extract transcript from HTML response');
+
+    throw new Error('Direct YouTube API failed - no transcript found');
   }
+
 
 
   // Parse JSON transcript format
