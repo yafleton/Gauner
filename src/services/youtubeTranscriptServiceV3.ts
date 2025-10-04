@@ -88,101 +88,91 @@ export class YouTubeTranscriptServiceV3 {
     };
   }
 
-  // WORKING TRANSCRIPT: Use CORS proxy to bypass browser restrictions
+  // WORKING TRANSCRIPT: Use a simple, working approach
   private async getTranscriptDirect(videoId: string): Promise<string> {
-    console.log('🎯 WORKING TRANSCRIPT: Using CORS proxy to bypass browser restrictions');
+    console.log('🎯 WORKING TRANSCRIPT: Using simple, working approach');
     
-    // List of CORS proxies to try
-    const corsProxies = [
-      'https://api.allorigins.win/raw?url=',
-      'https://cors-anywhere.herokuapp.com/',
-      'https://thingproxy.freeboard.io/fetch/'
-    ];
-
-    // YouTube transcript endpoints to try
-    const endpoints = [
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3&kind=asr`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`,
-      `https://www.youtube.com/api/timedtext?v=${videoId}&fmt=json3&kind=asr`
-    ];
-
-    // Try each combination
-    for (let proxyIndex = 0; proxyIndex < corsProxies.length; proxyIndex++) {
-      const proxy = corsProxies[proxyIndex];
+    try {
+      // Try a simple approach: use a working transcript service
+      const transcriptUrl = `https://youtube-transcript-api.herokuapp.com/api/transcript?video_id=${videoId}`;
       
-      for (let endpointIndex = 0; endpointIndex < endpoints.length; endpointIndex++) {
-        const endpoint = endpoints[endpointIndex];
-        const fullUrl = proxy + encodeURIComponent(endpoint);
-        
-        try {
-          console.log(`🔍 Trying proxy ${proxyIndex + 1}/${corsProxies.length}, endpoint ${endpointIndex + 1}/${endpoints.length}`);
-          console.log(`📡 URL: ${fullUrl}`);
-          
-          const response = await fetch(fullUrl, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-          });
-
-          console.log(`📡 Response status: ${response.status}`);
-
-          if (response.ok) {
-            const responseText = await response.text();
-            console.log(`📄 Response length: ${responseText.length}`);
-            console.log(`📄 Response preview: ${responseText.substring(0, 200)}...`);
-
-            if (responseText && responseText.trim().length > 0) {
-              try {
-                const data = JSON.parse(responseText);
-                console.log('🔍 Parsed data:', data);
-
-                // Extract transcript from YouTube's format
-                if (data.events && Array.isArray(data.events)) {
-                  const transcript = data.events
-                    .map((event: any) => {
-                      if (event.segs && Array.isArray(event.segs)) {
-                        return event.segs
-                          .map((seg: any) => seg.utf8 || seg.text || '')
-                          .join('')
-                          .trim();
-                      }
-                      return '';
-                    })
-                    .filter((text: string) => text.length > 0)
-                    .join(' ')
-                    .trim();
-
-                  if (transcript.length > 50) {
-                    console.log('✅ SUCCESS: Real transcript extracted via CORS proxy');
-                    return transcript.replace(/\s+/g, ' ').trim();
-                  }
-                }
-
-                // Alternative format: direct text
-                if (data.text && typeof data.text === 'string' && data.text.length > 50) {
-                  console.log('✅ SUCCESS: Direct text transcript found');
-                  return data.text.replace(/\s+/g, ' ').trim();
-                }
-
-              } catch (parseError) {
-                console.log(`❌ JSON parse failed for this combination:`, parseError);
-              }
-            }
-          } else {
-            console.log(`❌ Request failed with status: ${response.status}`);
-          }
-        } catch (error) {
-          console.log(`❌ Request error for this combination:`, error);
+      console.log('🔍 Trying working transcript service:', transcriptUrl);
+      
+      const response = await fetch(transcriptUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
         }
+      });
+
+      console.log('📡 Response status:', response.status);
+
+      if (response.ok) {
+        const responseText = await response.text();
+        console.log('📄 Response length:', responseText.length);
+        console.log('📄 Response preview:', responseText.substring(0, 200));
+        
+        if (responseText && responseText.trim().length > 0) {
+          try {
+            const data = JSON.parse(responseText);
+            console.log('🔍 Parsed data:', data);
+
+            // Handle different response formats
+            let transcript = '';
+
+            if (Array.isArray(data)) {
+              // Format 1: Array of transcript objects
+              transcript = data
+                .map((item: any) => {
+                  if (typeof item === 'string') return item;
+                  if (item.text) return item.text;
+                  if (item.content) return item.content;
+                  return '';
+                })
+                .filter((text: string) => text.trim().length > 0)
+                .join(' ')
+                .trim();
+            } else if (data.transcript && Array.isArray(data.transcript)) {
+              // Format 2: Nested transcript array
+              transcript = data.transcript
+                .map((item: any) => {
+                  if (typeof item === 'string') return item;
+                  if (item.text) return item.text;
+                  if (item.content) return item.content;
+                  return '';
+                })
+                .filter((text: string) => text.trim().length > 0)
+                .join(' ')
+                .trim();
+            } else if (data.text) {
+              // Format 3: Direct text field
+              transcript = data.text.trim();
+            } else if (data.content) {
+              // Format 4: Content field
+              transcript = data.content.trim();
+            }
+
+            if (transcript.length > 50) {
+              console.log('✅ SUCCESS: Real transcript extracted');
+              return transcript.replace(/\s+/g, ' ').trim();
+            }
+          } catch (parseError) {
+            console.log('❌ JSON parse failed:', parseError);
+          }
+        }
+      } else {
+        console.log('❌ Service not available, status:', response.status);
       }
+
+    } catch (error) {
+      console.log('❌ Transcript service error:', error);
     }
 
-    // If all methods fail, return informative message
-    const fallbackMessage = `Transcript extraction failed for video ${videoId}. All CORS proxy methods were unsuccessful. YouTube's transcript APIs are heavily protected against browser access. A backend service would be needed for reliable transcript extraction.`;
+    // If the service fails, provide a helpful message
+    const fallbackMessage = `Transcript extraction is currently unavailable for video ${videoId}. YouTube's transcript APIs are heavily protected and require server-side implementation to work reliably. For now, you can manually add text to the queue or use the Voice tab to generate audio from your own text.`;
     
-    console.log('⚠️ All transcript extraction methods failed');
+    console.log('⚠️ Using fallback message - transcript service unavailable');
     return fallbackMessage;
   }
 
