@@ -88,50 +88,70 @@ export class YouTubeTranscriptServiceV4 {
     };
   }
 
-  // WORKING METHOD: Use direct YouTube subtitle URL
+  // WORKING METHOD: Use Vercel-based transcript API
   private async getTranscriptSimple(videoId: string): Promise<string> {
-    console.log('🎯 WORKING METHOD: Using direct YouTube subtitle URL');
+    console.log('🎯 WORKING METHOD: Using Vercel-based transcript API');
     
     try {
-      // Use the direct YouTube subtitle URL method
-      const subtitleUrl = `https://video.google.com/timedtext?lang=en&v=${videoId}`;
+      // Use Vercel-based transcript API service
+      const apiUrl = `https://youtube-transcript-api.vercel.app/api/transcript?video_id=${videoId}`;
       
-      console.log('🔍 Calling direct YouTube subtitle URL:', subtitleUrl);
+      console.log('🔍 Calling Vercel transcript API:', apiUrl);
       
-      const response = await fetch(subtitleUrl, {
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
-          'Accept': 'application/xml, text/xml, */*',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'Accept': 'application/json'
         }
       });
 
       console.log('📡 Response status:', response.status);
 
       if (response.ok) {
-        const xmlText = await response.text();
-        console.log('📄 XML response length:', xmlText.length);
-        console.log('📄 XML response preview:', xmlText.substring(0, 500));
+        const responseData = await response.json();
+        console.log('📄 Response data:', responseData);
+
+        // Extract transcript from response
+        let transcript = '';
         
-        // Parse XML and extract transcript
-        const transcript = this.parseXMLTranscript(xmlText);
-        
+        if (Array.isArray(responseData)) {
+          // Array format: [{text: "...", start: 0, duration: 5}, ...]
+          transcript = responseData
+            .map((item: any) => item.text || item.transcript || '')
+            .join(' ')
+            .trim();
+        } else if (responseData && typeof responseData === 'object') {
+          // Object format
+          if (responseData.transcript) {
+            transcript = responseData.transcript;
+          } else if (responseData.text) {
+            transcript = responseData.text;
+          } else if (responseData.segments && Array.isArray(responseData.segments)) {
+            transcript = responseData.segments
+              .map((seg: any) => seg.text || seg.content || '')
+              .join(' ')
+              .trim();
+          }
+        } else if (typeof responseData === 'string') {
+          transcript = responseData;
+        }
+
         if (transcript && transcript.length > 10) {
-          console.log('✅ SUCCESS: Direct YouTube subtitle URL worked');
+          console.log('✅ SUCCESS: Vercel transcript API worked');
           console.log('📄 Transcript length:', transcript.length);
           console.log('📄 Transcript preview:', transcript.substring(0, 200));
           return transcript;
         } else {
-          console.log('❌ No transcript found in XML');
-          return `DEBUG: No transcript found in XML response for ${videoId}. XML length: ${xmlText.length}`;
+          console.log('❌ No transcript found in response');
+          return `DEBUG: No transcript found in Vercel API response for ${videoId}. Response: ${JSON.stringify(responseData).substring(0, 200)}`;
         }
       }
 
-      console.log('❌ Direct YouTube subtitle URL failed');
-      return `DEBUG: Direct YouTube subtitle URL failed for ${videoId}. Status: ${response.status}`;
+      console.log('❌ Vercel transcript API failed');
+      return `DEBUG: Vercel transcript API failed for ${videoId}. Status: ${response.status}`;
 
     } catch (error) {
-      console.log('❌ Direct YouTube subtitle URL error:', error);
+      console.log('❌ Vercel transcript API error:', error);
       return `DEBUG: Network error - ${error}`;
     }
   }
