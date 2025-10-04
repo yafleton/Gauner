@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Play, Trash2, RefreshCw, Download, AlertCircle, CheckCircle, Clock, Wand2, FileText, Youtube } from 'lucide-react';
-import { youtubeTranscriptServiceV2 } from '../../services/youtubeTranscriptServiceV2';
+import { youtubeTranscriptServiceV3 } from '../../services/youtubeTranscriptServiceV3';
 import { geminiService } from '../../services/geminiService';
 import { queueService, QueueItem, QueueStats } from '../../services/queueService';
 import { ScriptAnalysis } from '../../services/geminiService';
@@ -78,7 +78,7 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
       return;
     }
 
-    if (!youtubeTranscriptServiceV2.isValidYouTubeUrl(youtubeUrl)) {
+    if (!youtubeTranscriptServiceV3.isValidYouTubeUrl(youtubeUrl)) {
       setError('Please enter a valid YouTube URL');
       return;
     }
@@ -88,7 +88,7 @@ const YouTubeQueue: React.FC<YouTubeQueueProps> = ({ user }) => {
 
     try {
       console.log('🎥 Extracting transcript from:', youtubeUrl);
-      const result = await youtubeTranscriptServiceV2.extractTranscript(youtubeUrl);
+      const result = await youtubeTranscriptServiceV3.extractTranscript(youtubeUrl);
       
       console.log('✅ Transcript extracted:', result);
       
